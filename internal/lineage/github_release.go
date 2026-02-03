@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/google/go-github/v59/github"
 	"golang.org/x/oauth2"
@@ -34,17 +35,19 @@ func (gc *GitHubReleaseClient) UploadArtifacts(ctx context.Context, cfg Config, 
 }
 
 func (gc *GitHubReleaseClient) getOrCreateRelease(ctx context.Context, cfg Config) (*github.RepositoryRelease, error) {
-	release, _, err := gc.client.Repositories.GetReleaseByTag(ctx, cfg.ReleaseRepoOwner, cfg.ReleaseRepoName, cfg.ReleaseTag)
+	tag := buildReleaseTag(cfg)
+	release, _, err := gc.client.Repositories.GetReleaseByTag(ctx, cfg.BuildRepoOwner, cfg.BuildRepoName, tag)
 	if err == nil {
 		return release, nil
 	}
 
+	name, body := buildReleaseMetadata(cfg, tag)
 	releaseRequest := &github.RepositoryRelease{
-		TagName: github.String(cfg.ReleaseTag),
-		Name:    github.String(cfg.ReleaseName),
-		Body:    github.String(cfg.ReleaseNotes),
+		TagName: github.String(tag),
+		Name:    github.String(name),
+		Body:    github.String(body),
 	}
-	release, _, err = gc.client.Repositories.CreateRelease(ctx, cfg.ReleaseRepoOwner, cfg.ReleaseRepoName, releaseRequest)
+	release, _, err = gc.client.Repositories.CreateRelease(ctx, cfg.BuildRepoOwner, cfg.BuildRepoName, releaseRequest)
 	if err != nil {
 		return nil, fmt.Errorf("create release: %w", err)
 	}
@@ -58,11 +61,33 @@ func (gc *GitHubReleaseClient) uploadAsset(ctx context.Context, cfg Config, rele
 	}
 	defer file.Close()
 
-	_, _, err = gc.client.Repositories.UploadReleaseAsset(ctx, cfg.ReleaseRepoOwner, cfg.ReleaseRepoName, release.GetID(), &github.UploadOptions{
+	_, _, err = gc.client.Repositories.UploadReleaseAsset(ctx, cfg.BuildRepoOwner, cfg.BuildRepoName, release.GetID(), &github.UploadOptions{
 		Name: filepath.Base(path),
 	}, file)
 	if err != nil {
 		return fmt.Errorf("upload release asset: %w", err)
 	}
 	return nil
+}
+
+func buildReleaseTag(cfg Config) string {
+	if cfg.BuildRepoRef != "" {
+		return fmt.Sprintf("lineage-%s-%s", cfg.BuildRepoName, cfg.BuildRepoRef)
+	}
+	if cfg.BuildRepoSHA != "" {
+		return fmt.Sprintf("lineage-%s-%s", cfg.BuildRepoName, cfg.BuildRepoSHA)
+	}
+	if runID := os.Getenv("GITHUB_RUN_ID"); runID != "" {
+		return fmt.Sprintf("lineage-%s-run-%s", cfg.BuildRepoName, runID)
+	}
+	return fmt.Sprintf("lineage-%s-%s", cfg.BuildRepoName, time.Now().UTC().Format("20060102-150405.000"))
+}
+
+func buildReleaseMetadata(cfg Config, tag string) (string, string) {
+	name := fmt.Sprintf("LineageOS Build: %s", tag)
+	body := fmt.Sprintf("Automated LineageOS build for %s/%s", cfg.BuildRepoOwner, cfg.BuildRepoName)
+	if cfg.BuildRepoRef != "" {
+		body = fmt.Sprintf("%s (ref: %s)", body, cfg.BuildRepoRef)
+	}
+	return name, body
 }

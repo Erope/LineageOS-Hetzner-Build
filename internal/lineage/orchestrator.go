@@ -31,9 +31,11 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return err
 	}
 	defer func() {
-		err := o.hetznerClient.DeleteServer(context.Background(), server.ID)
-		if err != nil {
+		if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
 			log.Printf("failed to delete server %d: %v", server.ID, err)
+		}
+		if err := o.hetznerClient.DeleteSSHKey(context.Background(), server.SSHKeyID); err != nil {
+			log.Printf("failed to delete ssh key %d: %v", server.SSHKeyID, err)
 		}
 	}()
 
@@ -46,7 +48,11 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
 
-	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, o.cfg.KnownHostsPath, 30*time.Second)
+	knownHostsPath, err := ensureKnownHosts(server.IP, server.SSHPort, o.cfg.LocalArtifactDir)
+	if err != nil {
+		return err
+	}
+	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, knownHostsPath, 30*time.Second)
 	if err != nil {
 		return err
 	}

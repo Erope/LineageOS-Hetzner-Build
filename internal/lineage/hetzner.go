@@ -20,8 +20,9 @@ type HetznerServer struct {
 	Name       string
 	IP         string
 	SSHUser    string
-	SSHKey     string
+	SSHKey     []byte
 	SSHPort    int
+	SSHKeyID   int64
 	Datacenter string
 }
 
@@ -56,6 +57,20 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		}
 	}
 
+	privateKey, publicKey, err := GenerateEphemeralSSHKey()
+	if err != nil {
+		return nil, err
+	}
+
+	sshKeyName := fmt.Sprintf("lineage-builder-%d", time.Now().Unix())
+	createdKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
+		Name:      sshKeyName,
+		PublicKey: publicKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create ssh key: %w", err)
+	}
+
 	userData, err := readUserData(cfg.ServerUserDataPath)
 	if err != nil {
 		return nil, err
@@ -67,6 +82,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		Image:      image,
 		Location:   location,
 		UserData:   userData,
+		SSHKeys:    []*hcloud.SSHKey{createdKey},
 	}
 
 	result, _, err := hc.client.Server.Create(ctx, request)
@@ -89,9 +105,10 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		ID:         server.ID,
 		Name:       server.Name,
 		IP:         ip,
-		SSHUser:    cfg.InstanceSSHUser,
-		SSHKey:     cfg.InstanceSSHKeyPath,
+		SSHUser:    "root",
+		SSHKey:     privateKey,
 		SSHPort:    cfg.SSHPort,
+		SSHKeyID:   createdKey.ID,
 		Datacenter: server.Datacenter.Name,
 	}, nil
 }
@@ -100,6 +117,17 @@ func (hc *HetznerClient) DeleteServer(ctx context.Context, id int64) error {
 	_, err := hc.client.Server.Delete(ctx, &hcloud.Server{ID: id})
 	if err != nil {
 		return fmt.Errorf("delete server: %w", err)
+	}
+	return nil
+}
+
+func (hc *HetznerClient) DeleteSSHKey(ctx context.Context, id int64) error {
+	if id == 0 {
+		return nil
+	}
+	_, err := hc.client.SSHKey.Delete(ctx, &hcloud.SSHKey{ID: id})
+	if err != nil {
+		return fmt.Errorf("delete ssh key: %w", err)
 	}
 	return nil
 }

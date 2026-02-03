@@ -3,6 +3,9 @@ package lineage
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net"
@@ -23,10 +26,9 @@ type SSHClient struct {
 	Timeout    time.Duration
 }
 
-func NewSSHClient(addr, user, keyPath, knownHostsPath string, timeout time.Duration) (*SSHClient, error) {
-	keyBytes, err := os.ReadFile(filepath.Clean(keyPath))
-	if err != nil {
-		return nil, fmt.Errorf("read ssh key: %w", err)
+func NewSSHClient(addr, user string, privateKey []byte, knownHostsPath string, timeout time.Duration) (*SSHClient, error) {
+	if len(privateKey) == 0 {
+		return nil, fmt.Errorf("private key is required")
 	}
 	if knownHostsPath == "" {
 		return nil, fmt.Errorf("known hosts file is required")
@@ -34,7 +36,7 @@ func NewSSHClient(addr, user, keyPath, knownHostsPath string, timeout time.Durat
 	return &SSHClient{
 		Addr:       addr,
 		User:       user,
-		PrivateKey: keyBytes,
+		PrivateKey: privateKey,
 		KnownHosts: knownHostsPath,
 		Timeout:    timeout,
 	}, nil
@@ -174,4 +176,24 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 		return nil, fmt.Errorf("ssh handshake: %w", err)
 	}
 	return ssh.NewClient(clientConn, chans, reqs), nil
+}
+
+func GenerateEphemeralSSHKey() (privatePEM []byte, publicKey string, err error) {
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate ed25519 key: %w", err)
+	}
+
+	privateBytes, err := ssh.MarshalPrivateKey(privateKey, "")
+	if err != nil {
+		return nil, "", fmt.Errorf("marshal private key: %w", err)
+	}
+
+	privatePEM = pem.EncodeToMemory(privateBytes)
+	sshPublicKey, err := ssh.NewPublicKey(privateKey.Public())
+	if err != nil {
+		return nil, "", fmt.Errorf("marshal public key: %w", err)
+	}
+	publicKey = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPublicKey)))
+	return privatePEM, publicKey, nil
 }
