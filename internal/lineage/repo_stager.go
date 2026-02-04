@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func PrepareRepositoryArchive(ctx context.Context, cfg Config) (string, func(), error) {
@@ -27,7 +26,12 @@ func PrepareRepositoryArchive(ctx context.Context, cfg Config) (string, func(), 
 	if err != nil {
 		return "", nil, fmt.Errorf("create staging dir: %w", err)
 	}
-	archivePath := filepath.Join(baseDir, fmt.Sprintf("lineage-repo-%d.tar.gz", time.Now().UnixNano()))
+	suffix, err := randomSuffix()
+	if err != nil {
+		_ = os.RemoveAll(stagingDir)
+		return "", nil, err
+	}
+	archivePath := filepath.Join(baseDir, fmt.Sprintf("lineage-repo-%s.tar.gz", suffix))
 	cleanup := func() {
 		_ = os.RemoveAll(stagingDir)
 		_ = os.Remove(archivePath)
@@ -103,7 +107,7 @@ func normalizeRepoURL(repoURL string) (string, error) {
 }
 
 func buildAuthHeader(token string) string {
-	payload := fmt.Sprintf("x-access-token:%s", strings.TrimSpace(token))
+	payload := fmt.Sprintf("x-access-token:%s", token)
 	encoded := base64.StdEncoding.EncodeToString([]byte(payload))
 	return fmt.Sprintf("AUTHORIZATION: basic %s", encoded)
 }

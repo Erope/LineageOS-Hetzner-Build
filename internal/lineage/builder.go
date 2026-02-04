@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type BuildResult struct {
@@ -36,7 +35,7 @@ func NewBuilder(ssh *SSHClient, cfg Config) *Builder {
 }
 
 func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
-	if err := b.prepare(ctx); err != nil {
+	if err := b.runCompose(ctx); err != nil {
 		return BuildResult{Logs: b.joinLogs()}, err
 	}
 	artifacts, err := b.collectArtifacts(ctx)
@@ -46,7 +45,7 @@ func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
 	return BuildResult{Artifacts: artifacts, Logs: b.joinLogs()}, nil
 }
 
-func (b *Builder) prepare(ctx context.Context) error {
+func (b *Builder) runCompose(ctx context.Context) error {
 	commands := []string{
 		"set -euo pipefail",
 	}
@@ -65,7 +64,11 @@ func (b *Builder) StageRepository(ctx context.Context, archivePath string) error
 	}
 	defer file.Close()
 
-	remoteArchive := fmt.Sprintf("/tmp/lineage-repo-%d.tar.gz", time.Now().UnixNano())
+	suffix, err := randomSuffix()
+	if err != nil {
+		return err
+	}
+	remoteArchive := fmt.Sprintf("/tmp/lineage-repo-%s.tar.gz", suffix)
 	if err := b.ssh.Upload(ctx, remoteArchive, file, 0o600); err != nil {
 		return fmt.Errorf("upload repository archive: %w", err)
 	}

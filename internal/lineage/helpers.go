@@ -3,6 +3,8 @@ package lineage
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -75,4 +77,12 @@ func isValidHost(host string) bool {
 		}
 	}
 	return true
+}
+
+func randomSuffix() (string, error) {
+	randomBytes := make([]byte, 6)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("generate random suffix: %w", err)
+	}
+	return hex.EncodeToString(randomBytes), nil
 }
