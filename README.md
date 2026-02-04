@@ -34,9 +34,9 @@ export GITHUB_TOKEN=...
 go run ./cmd/lineage-builder
 ```
 
-## GitHub Actions（可复用）
+## GitHub Actions（可重用）
 
-该仓库提供可复用的 GitHub Actions 工作流，方便其他仓库直接引用。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
+该仓库提供可重用的 GitHub Actions 工作流，方便其他仓库直接引用。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
 
 在你的仓库中新增一个 workflow 文件，例如 `.github/workflows/lineage-build.yml`：
 
