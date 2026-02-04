@@ -53,9 +53,9 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	}
 	commands = append(commands, dockerInstallCommand())
 	commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)))
-	commands = append(commands, "docker compose version || docker-compose --version")
-	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
-	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
+	commands = append(commands, "docker_compose version")
+	commands = append(commands, fmt.Sprintf("docker_compose -f %s pull", shellQuote(b.compose)))
+	commands = append(commands, fmt.Sprintf("docker_compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
 	command := strings.Join(commands, " && ")
 	return b.runCommand(ctx, command)
 }
@@ -78,9 +78,26 @@ install_docker_packages() {
   apt-get install -y --no-install-recommends "$@" || { echo 'apt-get install failed' >&2; exit 1; }
 }
 
+docker_compose_available() {
+  docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1
+}
+
+docker_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+    return
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+    return
+  fi
+  echo 'docker compose is required but not installed' >&2
+  return 1
+}
+
 if ! command -v docker >/dev/null 2>&1; then
   install_docker_packages docker.io docker-compose-plugin
-elif ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+elif ! docker_compose_available; then
   install_docker_packages docker-compose-plugin
 fi`)
 }
