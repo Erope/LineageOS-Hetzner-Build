@@ -3,6 +3,7 @@ package lineage
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,6 +49,12 @@ func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
 }
 
 func (b *Builder) runCompose(ctx context.Context) error {
+	// [DIAGNOSE] compose 执行前：确认 docker-compose.yml 存在
+	b.logDiagnostic("Pre-compose: checking if compose file exists")
+	checkCmd := fmt.Sprintf("ls -la %s/%s 2>&1 || echo 'COMPOSE_FILE_NOT_FOUND'", shellQuote(b.workDir), shellQuote(b.compose))
+	stdout, stderr, _ := b.ssh.Run(ctx, checkCmd)
+	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Compose file check: stdout=%s stderr=%s", stdout, stderr))
+
 	command := b.buildComposeCommand()
 	return b.runCommand(ctx, command)
 }
@@ -58,6 +65,8 @@ func (b *Builder) buildComposeCommand() string {
 	}
 	commands = append(commands, dockerInstallCommand())
 	commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)))
+	// [DIAGNOSE] 进入目录后打印当前目录内容
+	commands = append(commands, "echo '[DIAGNOSE] Current directory after cd:' && pwd && ls -la")
 	commands = append(commands, "docker compose version")
 	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
 	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
@@ -106,6 +115,13 @@ fi`)
 }
 
 func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
+	// [DIAGNOSE] 上传前：打印本地 archive 信息
+	if info, err := os.Stat(archivePath); err == nil {
+		log.Printf("[DIAGNOSE] Pre-upload: local archive=%s, size=%d bytes", archivePath, info.Size())
+	} else {
+		log.Printf("[DIAGNOSE] Pre-upload: failed to stat local archive=%s: %v", archivePath, err)
+	}
+
 	file, err := os.Open(filepath.Clean(archivePath))
 	if err != nil {
 		return fmt.Errorf("open source archive: %w", err)
@@ -121,6 +137,12 @@ func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 		return fmt.Errorf("upload source archive: %w", err)
 	}
 
+	// [DIAGNOSE] 上传后：确认远程文件存在
+	b.logDiagnostic("Post-upload: verifying remote archive exists")
+	verifyCmd := fmt.Sprintf("ls -la %s", remoteArchive)
+	stdout, stderr, _ := b.ssh.Run(ctx, verifyCmd)
+	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Remote archive verification: stdout=%s stderr=%s", stdout, stderr))
+
 	commands := []string{
 		"set -euo pipefail",
 		fmt.Sprintf("rm -rf %s", shellQuote(b.workDir)),
@@ -129,6 +151,11 @@ func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 		fmt.Sprintf("rm -f %s", shellQuote(remoteArchive)),
 	}
 	command := strings.Join(commands, " && ")
+
+	// [DIAGNOSE] 解压后：打印工作目录内容
+	command += fmt.Sprintf(" && echo '[DIAGNOSE] Post-extract: listing workDir=%s' && ls -la %s", b.workDir, shellQuote(b.workDir))
+	command += fmt.Sprintf(" && echo '[DIAGNOSE] Post-extract: find all files in workDir' && find %s -type f 2>&1 | head -50", shellQuote(b.workDir))
+
 	return b.runCommand(ctx, command)
 }
 
@@ -205,4 +232,11 @@ func (b *Builder) runCommand(ctx context.Context, command string) error {
 		return fmt.Errorf("remote command failed: %w", err)
 	}
 	return nil
+}
+
+// [DIAGNOSE] logDiagnostic 打印诊断日志
+func (b *Builder) logDiagnostic(msg string) {
+	logMsg := fmt.Sprintf("[DIAGNOSE] %s", msg)
+	log.Printf(logMsg)
+	b.logs = append(b.logs, logMsg)
 }

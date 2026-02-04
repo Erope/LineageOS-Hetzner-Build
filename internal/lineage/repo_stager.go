@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,14 +36,41 @@ func PrepareRepositoryArchive(ctx context.Context, cfg Config) (string, func(), 
 		_ = os.RemoveAll(stagingDir)
 		_ = os.Remove(archivePath)
 	}
+
+	// [DIAGNOSE] 复制前：打印 sourceDir 内容
+	log.Printf("[DIAGNOSE] Pre-copy: listing sourceDir=%s", cfg.BuildSourceDir)
+	if listErr := listDirectory(ctx, cfg.BuildSourceDir); listErr != nil {
+		log.Printf("[DIAGNOSE] Warning: failed to list sourceDir: %v", listErr)
+	}
+
 	if err := stageSourceDirectory(ctx, cfg.BuildSourceDir, stagingDir); err != nil {
 		cleanup()
 		return "", nil, err
 	}
+
+	// [DIAGNOSE] 复制后：打印 dest 内容
+	log.Printf("[DIAGNOSE] Post-copy: listing stagingDir=%s", stagingDir)
+	if listErr := listDirectory(ctx, stagingDir); listErr != nil {
+		log.Printf("[DIAGNOSE] Warning: failed to list stagingDir: %v", listErr)
+	}
+
+	// [DIAGNOSE] 压缩前：打印即将打包的路径
+	log.Printf("[DIAGNOSE] Pre-archive: creating tar.gz from stagingDir=%s to archivePath=%s", stagingDir, archivePath)
+
 	if err := createRepoArchive(ctx, stagingDir, archivePath); err != nil {
 		cleanup()
 		return "", nil, err
 	}
+
+	// [DIAGNOSE] 压缩后：打印 archive 文件大小和内容列表
+	log.Printf("[DIAGNOSE] Post-archive: checking archive=%s", archivePath)
+	if statErr := statFile(archivePath); statErr != nil {
+		log.Printf("[DIAGNOSE] Warning: failed to stat archive: %v", statErr)
+	}
+	if listErr := listTarContents(ctx, archivePath); listErr != nil {
+		log.Printf("[DIAGNOSE] Warning: failed to list tar contents: %v", listErr)
+	}
+
 	return archivePath, cleanup, nil
 }
 
@@ -69,8 +97,46 @@ func stageSourceDirectory(ctx context.Context, sourceDir, dest string) error {
 	if _, err := os.Stat(sourceDir); err != nil {
 		return fmt.Errorf("check BUILD_SOURCE_DIR: %w", err)
 	}
-	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return fmt.Errorf("create staging dir: %w", err)
+	// 使用 -T 选项避免创建多余的子目录
+	// cp -aT 会把 sourceDir 的内容复制到 dest，不会在 dest 下创建 sourceDir 的子目录
+	return runLocalCommand(ctx, "cp", "-aT", sourceDir, dest)
+}
+
+// [DIAGNOSE] listDirectory 打印目录的文件列表
+func listDirectory(ctx context.Context, dir string) error {
+	cmd := exec.CommandContext(ctx, "ls", "-la", dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return err
 	}
-	return runLocalCommand(ctx, "cp", "-a", filepath.Join(sourceDir, "."), dest)
+	log.Printf("[DIAGNOSE] Directory listing of %s:\n%s", dir, string(output))
+
+	// 同时打印 find 结果查看完整树形结构
+	cmd2 := exec.CommandContext(ctx, "find", dir, "-type", "f")
+	output2, err2 := cmd2.CombinedOutput()
+	if err2 == nil {
+		log.Printf("[DIAGNOSE] File tree of %s:\n%s", dir, string(output2))
+	}
+	return nil
+}
+
+// [DIAGNOSE] statFile 打印文件信息
+func statFile(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	log.Printf("[DIAGNOSE] Archive file: path=%s, size=%d bytes", path, info.Size())
+	return nil
+}
+
+// [DIAGNOSE] listTarContents 打印 tar.gz 内容列表
+func listTarContents(ctx context.Context, archivePath string) error {
+	cmd := exec.CommandContext(ctx, "tar", "-tzf", archivePath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+	log.Printf("[DIAGNOSE] Archive contents:\n%s", string(output))
+	return nil
 }
