@@ -14,6 +14,7 @@ func TestDockerInstallCommandContainsExpectedContent(t *testing.T) {
 		"docker_compose_available()",
 		"ensure the build server runs as root",
 		"curl is required to install Docker",
+		"running get.docker.com installer",
 	}
 	for _, snippet := range expectedSnippets {
 		if !strings.Contains(command, snippet) {

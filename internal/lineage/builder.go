@@ -71,10 +71,11 @@ install_docker_packages() {
     exit 1
   fi
   if ! command -v curl >/dev/null 2>&1; then
-    echo 'curl is required to install Docker; ensure the build server image includes curl' >&2
+    echo 'curl is required to install Docker; set HETZNER_SERVER_IMAGE to a Debian/Ubuntu image that includes curl' >&2
     exit 1
   fi
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
+  echo 'running get.docker.com installer; ensure the network path to Docker is trusted' >&2
   sh /tmp/get-docker.sh || { echo 'Docker install failed; check network connectivity and repository configuration' >&2; exit 1; }
   rm -f /tmp/get-docker.sh
 }
