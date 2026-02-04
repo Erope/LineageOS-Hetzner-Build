@@ -23,6 +23,8 @@ type Builder struct {
 	logs             []string
 }
 
+const commandLogPrefix = ">>>"
+
 func NewBuilder(ssh *SSHClient, cfg Config) *Builder {
 	return &Builder{
 		ssh:              ssh,
@@ -124,21 +126,30 @@ func (b *Builder) SaveRemoteLogs(ctx context.Context) (string, error) {
 	if stderr != "" {
 		b.logs = append(b.logs, stderr)
 	}
-	if stderr == "" {
-		return stdout, err
-	}
-	if stdout == "" {
-		return stderr, err
-	}
-	return stdout + "\n" + stderr, err
+	return joinLogParts(stdout, stderr), err
 }
 
 func (b *Builder) joinLogs() string {
 	return strings.Join(b.logs, "\n")
 }
 
+// joinLogParts trims log values and joins the non-empty parts with newlines.
+// It is used across the lineage package to normalize log output and is
+// intentionally package-level for reuse.
+func joinLogParts(values ...string) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		parts = append(parts, trimmed)
+	}
+	return strings.Join(parts, "\n")
+}
+
 func (b *Builder) runCommand(ctx context.Context, command string) error {
-	b.logs = append(b.logs, fmt.Sprintf(">>> %s", command))
+	b.logs = append(b.logs, fmt.Sprintf("%s %s", commandLogPrefix, command))
 	stdout, stderr, err := b.ssh.Run(ctx, command)
 	b.logs = append(b.logs, stdout)
 	if stderr != "" {
