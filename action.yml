@@ -4,12 +4,6 @@ inputs:
   HETZNER_TOKEN:
     description: Hetzner Cloud API Token
     required: true
-  BUILD_REPO_URL:
-    description: docker-lineage-cicd repository URL
-    required: true
-  GITHUB_TOKEN:
-    description: GitHub token for release upload
-    required: true
   HETZNER_SERVER_TYPE:
     description: Hetzner server type
     required: false
@@ -28,29 +22,17 @@ inputs:
   HETZNER_SSH_PORT:
     description: SSH port
     required: false
-  BUILD_REPO_REF:
-    description: Build repo ref
-    required: false
-  BUILD_REPO_TOKEN:
-    description: Build repo token for private repos
-    required: false
   BUILD_COMPOSE_FILE:
     description: docker-compose file path
     required: false
   BUILD_WORKDIR:
     description: Working directory on instance
     required: false
-  BUILD_TIMEOUT_MINUTES:
-    description: Build timeout in minutes
-    required: false
   ARTIFACT_DIR:
     description: Remote artifact directory
     required: false
   ARTIFACT_PATTERN:
     description: Artifact file glob
-    required: false
-  LOCAL_ARTIFACT_DIR:
-    description: Local artifact directory
     required: false
 runs:
   using: composite
@@ -72,14 +54,11 @@ runs:
         HETZNER_SERVER_NAME: ${{ inputs.HETZNER_SERVER_NAME }}
         HETZNER_SERVER_USER_DATA: ${{ inputs.HETZNER_SERVER_USER_DATA }}
         HETZNER_SSH_PORT: ${{ inputs.HETZNER_SSH_PORT }}
-        BUILD_REPO_URL: ${{ inputs.BUILD_REPO_URL }}
-        BUILD_REPO_REF: ${{ inputs.BUILD_REPO_REF }}
-        BUILD_REPO_TOKEN: ${{ inputs.BUILD_REPO_TOKEN }}
-        GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
+        BUILD_REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        BUILD_REPO_REF: ${{ github.sha }}
+        GITHUB_TOKEN: ${{ github.token }}
         BUILD_COMPOSE_FILE: ${{ inputs.BUILD_COMPOSE_FILE }}
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
-        BUILD_TIMEOUT_MINUTES: ${{ inputs.BUILD_TIMEOUT_MINUTES }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
         ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}
-        LOCAL_ARTIFACT_DIR: ${{ inputs.LOCAL_ARTIFACT_DIR }}
       run: ./lineage-builder

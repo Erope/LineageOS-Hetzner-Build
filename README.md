@@ -34,74 +34,30 @@ export GITHUB_TOKEN=...
 go run ./cmd/lineage-builder
 ```
 
-## GitHub Actions (可重用)
-
-该仓库提供可重用的 GitHub Actions 工作流，方便其他仓库直接引用。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
-
-在你的仓库中新增一个 workflow 文件，例如 `.github/workflows/lineage-build.yml`：
-
-```yaml
-name: LineageOS Build
-
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    uses: Erope/LineageOS-Hetzner-Build/.github/workflows/lineage-build-reusable.yml@<tag-or-sha>
-    secrets:
-      HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
-      BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # 以下为可选
-      HETZNER_SERVER_TYPE: ${{ secrets.HETZNER_SERVER_TYPE }}
-      HETZNER_SERVER_LOCATION: ${{ secrets.HETZNER_SERVER_LOCATION }}
-      HETZNER_SERVER_IMAGE: ${{ secrets.HETZNER_SERVER_IMAGE }}
-      HETZNER_SERVER_NAME: ${{ secrets.HETZNER_SERVER_NAME }}
-      HETZNER_SERVER_USER_DATA: ${{ secrets.HETZNER_SERVER_USER_DATA }}
-      HETZNER_SSH_PORT: ${{ secrets.HETZNER_SSH_PORT }}
-      BUILD_REPO_REF: ${{ secrets.BUILD_REPO_REF }}
-      BUILD_REPO_TOKEN: ${{ secrets.BUILD_REPO_TOKEN }}
-      BUILD_COMPOSE_FILE: ${{ secrets.BUILD_COMPOSE_FILE }}
-      BUILD_WORKDIR: ${{ secrets.BUILD_WORKDIR }}
-      BUILD_TIMEOUT_MINUTES: ${{ secrets.BUILD_TIMEOUT_MINUTES }}
-      ARTIFACT_DIR: ${{ secrets.ARTIFACT_DIR }}
-      ARTIFACT_PATTERN: ${{ secrets.ARTIFACT_PATTERN }}
-      LOCAL_ARTIFACT_DIR: ${{ secrets.LOCAL_ARTIFACT_DIR }}
-```
-
-建议使用固定的 tag 或提交 SHA 以确保可重现性。示例中的 `<tag-or-sha>` 请替换为实际发布的版本或提交。
-
-执行前请在仓库 Secrets 中设置必要的变量：
-
-- `HETZNER_TOKEN`
-- `BUILD_REPO_URL`
-- `GITHUB_TOKEN`
-
 ## GitHub Actions (Step 引用)
 
-如果你希望把它作为 step 直接引入，可使用此仓库提供的 composite action：
+该仓库提供 composite action，可在其他仓库作为单个 step 引入。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
 
 ```yaml
 - name: LineageOS Build
   uses: Erope/LineageOS-Hetzner-Build@<tag-or-sha>
   with:
     HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
-    BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     # 以下为可选
-    HETZNER_SERVER_TYPE: ${{ secrets.HETZNER_SERVER_TYPE }}
-    HETZNER_SERVER_LOCATION: ${{ secrets.HETZNER_SERVER_LOCATION }}
-    HETZNER_SERVER_IMAGE: ${{ secrets.HETZNER_SERVER_IMAGE }}
-    HETZNER_SERVER_NAME: ${{ secrets.HETZNER_SERVER_NAME }}
-    HETZNER_SERVER_USER_DATA: ${{ secrets.HETZNER_SERVER_USER_DATA }}
-    HETZNER_SSH_PORT: ${{ secrets.HETZNER_SSH_PORT }}
-    BUILD_REPO_REF: ${{ secrets.BUILD_REPO_REF }}
-    BUILD_REPO_TOKEN: ${{ secrets.BUILD_REPO_TOKEN }}
-    BUILD_COMPOSE_FILE: ${{ secrets.BUILD_COMPOSE_FILE }}
-    BUILD_WORKDIR: ${{ secrets.BUILD_WORKDIR }}
-    BUILD_TIMEOUT_MINUTES: ${{ secrets.BUILD_TIMEOUT_MINUTES }}
-    ARTIFACT_DIR: ${{ secrets.ARTIFACT_DIR }}
-    ARTIFACT_PATTERN: ${{ secrets.ARTIFACT_PATTERN }}
-    LOCAL_ARTIFACT_DIR: ${{ secrets.LOCAL_ARTIFACT_DIR }}
+    HETZNER_SERVER_TYPE: cx41
+    HETZNER_SERVER_LOCATION: fsn1
+    HETZNER_SERVER_IMAGE: ubuntu-22.04
+    HETZNER_SERVER_NAME: lineageos-builder
+    HETZNER_SERVER_USER_DATA: ./cloud-init.yml
+    HETZNER_SSH_PORT: 22
+    BUILD_COMPOSE_FILE: docker-compose.yml
+    BUILD_WORKDIR: lineageos-build
+    ARTIFACT_DIR: zips
+    ARTIFACT_PATTERN: "*.zip"
 ```
+
+`BUILD_REPO_REF` 会自动使用当前 workflow 的提交 SHA，`GITHUB_TOKEN` 会使用当前仓库默认权限。
+
+执行前请在仓库 Secrets 中设置必要的变量：
+
+- `HETZNER_TOKEN`
