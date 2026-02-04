@@ -19,6 +19,14 @@ func shellQuote(value string) string {
 }
 
 func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
+	output, err := scanHostKey(host, port)
+	if err != nil {
+		return "", err
+	}
+	return writeKnownHosts(output, baseDir)
+}
+
+func scanHostKey(host string, port int) (string, error) {
 	if !isValidHost(host) {
 		return "", fmt.Errorf("invalid host: %s", host)
 	}
@@ -34,10 +42,14 @@ func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ssh-keyscan failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	output := stdout.String()
-	if strings.TrimSpace(output) == "" {
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
 		return "", fmt.Errorf("ssh-keyscan returned no data for %s", host)
 	}
+	return output, nil
+}
+
+func writeKnownHosts(output string, baseDir string) (string, error) {
 	if baseDir == "" {
 		baseDir = os.TempDir()
 	}
@@ -85,4 +97,33 @@ func randomSuffix() (string, error) {
 		return "", fmt.Errorf("generate random suffix: %w", err)
 	}
 	return hex.EncodeToString(randomBytes), nil
+}
+
+func isRescueHostname(hostname string) bool {
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	return hostname == "rescue" || strings.HasPrefix(hostname, "rescue-")
+}
+
+func isRescueRootFilesystem(output string) bool {
+	const (
+		// df -T output fields: Filesystem, Type, 1K-blocks, Used, Available, Use%, Mounted on.
+		dfTypeFieldIndex       = 1
+		dfMountPointFieldIndex = 6
+		dfExpectedFieldCount   = 7
+	)
+	output = strings.ToLower(output)
+	for _, line := range strings.Split(output, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < dfExpectedFieldCount {
+			continue
+		}
+		if fields[dfMountPointFieldIndex] != "/" {
+			continue
+		}
+		fsType := fields[dfTypeFieldIndex]
+		if fsType == "tmpfs" || fsType == "ramfs" {
+			return true
+		}
+	}
+	return false
 }

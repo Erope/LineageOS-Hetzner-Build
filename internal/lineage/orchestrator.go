@@ -57,16 +57,23 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
 
+	// known_hosts is deferred until rescue exit so we can tolerate the rescue host key.
+	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, "", 30*time.Second)
+	if err != nil {
+		return err
+	}
+	// Rescue mode can persist several minutes while the instance reboots into the final OS.
+	const rescueExitTimeout = 8 * time.Minute
+	if err := waitForRescueExit(ctx, sshClient, rescueExitTimeout); err != nil {
+		return err
+	}
 	knownHostsPath, err := ensureKnownHosts(server.IP, server.SSHPort, o.cfg.LocalArtifactDir)
 	if err != nil {
 		return err
 	}
-	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, knownHostsPath, 30*time.Second)
-	if err != nil {
-		return err
-	}
-
-	builder := NewBuilder(sshClient, o.cfg)
+	// Switch to verified host keys now that rescue mode has exited.
+	verifiedClient := sshClient.WithKnownHosts(knownHostsPath)
+	builder := NewBuilder(verifiedClient, o.cfg)
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
 
@@ -134,6 +141,38 @@ func saveLogs(cfg Config, logs string) error {
 	}
 	path := filepath.Join(cfg.LocalArtifactDir, "build.log")
 	return os.WriteFile(path, []byte(logs), 0o600)
+}
+
+func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		hostname, _, hostnameErr := sshClient.Run(ctx, "hostname")
+		if hostnameErr != nil {
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for rescue system to exit")
+			}
+			if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+				return err
+			}
+			continue
+		}
+		// Expect Linux with coreutils df output in Hetzner rescue/ubuntu images.
+		rootFs, _, rootFsErr := sshClient.Run(ctx, "df -T /")
+		if rootFsErr == nil {
+			if !isRescueHostname(hostname) && !isRescueRootFilesystem(rootFs) {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for rescue system to exit")
+		}
+		if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+			return err
+		}
+	}
 }
 
 func sanitizeLog(input string) string {
