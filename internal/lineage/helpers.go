@@ -14,6 +14,10 @@ import (
 	"time"
 )
 
+const hostKeyStabilityMatches = 3
+
+var hostKeyStabilityInterval = 5 * time.Second
+
 func shellQuote(value string) string {
 	return fmt.Sprintf("'%s'", strings.ReplaceAll(value, "'", "'\\''"))
 }
@@ -27,8 +31,6 @@ func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
 }
 
 func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir string, timeout time.Duration) (string, error) {
-	const hostKeyStabilityInterval = 5 * time.Second
-	const hostKeyStabilityMatches = 3
 	deadline := time.Now().Add(timeout)
 	var lastKey string
 	var hasLastKey bool
