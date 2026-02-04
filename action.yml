@@ -38,14 +38,18 @@ runs:
   using: composite
   steps:
     - uses: actions/checkout@v4
+      with:
+        repository: Erope/LineageOS-Hetzner-Build
     - uses: actions/setup-go@v5
       with:
         go-version: 1.24.x
     - name: Compile builder
       shell: bash
+      working-directory: ${{ github.action_path }}
       run: go build -o lineage-builder ./cmd/lineage-builder
     - name: Run builder
       shell: bash
+      working-directory: ${{ github.action_path }}
       env:
         HETZNER_TOKEN: ${{ inputs.HETZNER_TOKEN }}
         HETZNER_SERVER_TYPE: ${{ inputs.HETZNER_SERVER_TYPE }}
@@ -61,4 +65,4 @@ runs:
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
         ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}
-      run: ./lineage-builder
+      run: ${{ github.action_path }}/lineage-builder
