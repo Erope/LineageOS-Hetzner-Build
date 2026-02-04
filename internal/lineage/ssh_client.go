@@ -158,7 +158,7 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 
 	hostKeyCallback, err := knownhosts.New(filepath.Clean(c.KnownHosts))
 	if err != nil {
-		return nil, fmt.Errorf("load known hosts: %w", err)
+		return nil, fmt.Errorf("load known_hosts: %w", err)
 	}
 
 	config := &ssh.ClientConfig{
@@ -177,12 +177,15 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 	if !errors.As(err, &keyErr) {
 		return nil, err
 	}
-	if err := c.refreshKnownHosts(); err != nil {
+	if len(keyErr.Want) > 0 {
 		return nil, err
+	}
+	if err := c.refreshKnownHosts(); err != nil {
+		return nil, fmt.Errorf("refresh known_hosts for unknown host: %w", err)
 	}
 	hostKeyCallback, err = knownhosts.New(filepath.Clean(c.KnownHosts))
 	if err != nil {
-		return nil, fmt.Errorf("load known hosts: %w", err)
+		return nil, fmt.Errorf("load known_hosts: %w", err)
 	}
 	config.HostKeyCallback = hostKeyCallback
 	return c.connect(config)
@@ -196,7 +199,9 @@ func (c *SSHClient) connect(config *ssh.ClientConfig) (*ssh.Client, error) {
 
 	clientConn, chans, reqs, err := ssh.NewClientConn(conn, c.Addr, config)
 	if err != nil {
-		_ = conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			return nil, fmt.Errorf("ssh handshake failed and connection close failed: %w", errors.Join(err, closeErr))
+		}
 		return nil, fmt.Errorf("ssh handshake: %w", err)
 	}
 	return ssh.NewClient(clientConn, chans, reqs), nil
