@@ -53,9 +53,9 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	}
 	commands = append(commands, dockerInstallCommand())
 	commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)))
-	commands = append(commands, "docker_compose version")
-	commands = append(commands, fmt.Sprintf("docker_compose -f %s pull", shellQuote(b.compose)))
-	commands = append(commands, fmt.Sprintf("docker_compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
+	commands = append(commands, "docker compose version")
+	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
+	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
 	command := strings.Join(commands, " && ")
 	return b.runCommand(ctx, command)
 }
@@ -70,35 +70,23 @@ install_docker_packages() {
     echo 'root privileges are required to install Docker; ensure the build server runs as root' >&2
     exit 1
   fi
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo 'apt-get is required to install Docker; set HETZNER_SERVER_IMAGE to a Debian/Ubuntu image' >&2
+  if ! command -v curl >/dev/null 2>&1; then
+    echo 'curl is required to install Docker; ensure the build server image includes curl' >&2
     exit 1
   fi
-  apt-get update || { echo 'apt-get update failed; check network connectivity and repository configuration' >&2; exit 1; }
-  apt-get install -y --no-install-recommends "$@" || { echo 'apt-get install failed; check network connectivity and repository configuration' >&2; exit 1; }
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
+  sh /tmp/get-docker.sh || { echo 'Docker install failed; check network connectivity and repository configuration' >&2; exit 1; }
+  rm -f /tmp/get-docker.sh
 }
 
 docker_compose_available() {
-  docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1
-}
-
-docker_compose() {
-  if docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
-    return
-  fi
-  if command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
-    return
-  fi
-  echo 'docker compose is required but not available; installation may have failed' >&2
-  return 1
+  docker compose version >/dev/null 2>&1
 }
 
 if ! command -v docker >/dev/null 2>&1; then
-  install_docker_packages docker.io docker-compose-plugin
+  install_docker_packages
 elif ! docker_compose_available; then
-  install_docker_packages docker-compose-plugin
+  install_docker_packages
 fi`)
 }
 
