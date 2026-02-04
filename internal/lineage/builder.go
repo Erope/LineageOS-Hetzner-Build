@@ -60,11 +60,13 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	return b.runCommand(ctx, command)
 }
 
+// dockerInstallCommand returns a shell script that ensures Docker and the
+// Docker Compose plugin are installed before running the build commands.
 func dockerInstallCommand() string {
 	return strings.TrimSpace(`
 install_docker_packages() {
   if [ "$(id -u)" -ne 0 ]; then
-    echo 'root privileges are required to install Docker; run as root or via sudo' >&2
+    echo 'root privileges are required to install Docker; rerun the build as root' >&2
     exit 1
   fi
   if ! command -v apt-get >/dev/null 2>&1; then
