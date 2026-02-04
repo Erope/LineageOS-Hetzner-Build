@@ -78,7 +78,7 @@ func normalizeComposeFilePath(buildSourceDir, composeFile string) (string, error
 		return "", nil
 	}
 	cleaned := filepath.Clean(composeFile)
-	if cleaned == "." || strings.HasSuffix(cleaned, string(filepath.Separator)) {
+	if cleaned == "." || cleaned == ".." || strings.HasSuffix(composeFile, string(filepath.Separator)) {
 		return "", fmt.Errorf("BUILD_COMPOSE_FILE must point to a file")
 	}
 	buildAbs, err := filepath.Abs(buildSourceDir)

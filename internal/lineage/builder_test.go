@@ -102,22 +102,22 @@ func TestNormalizeComposeFilePath(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := normalizeComposeFilePath(test.buildSource, test.composeFile)
-			if test.expectErr {
+			got, err := normalizeComposeFilePath(tc.buildSource, tc.composeFile)
+			if tc.expectErr {
 				if err == nil {
-					t.Fatalf("expected error for %s", test.name)
+					t.Fatalf("expected error for %s", tc.name)
 				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if got != test.expected {
-				t.Fatalf("expected %q, got %q", test.expected, got)
+			if got != tc.expected {
+				t.Fatalf("expected %q, got %q", tc.expected, got)
 			}
 		})
 	}
