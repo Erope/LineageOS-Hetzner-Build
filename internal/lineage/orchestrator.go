@@ -48,7 +48,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 			return err
 		}
 		if len(keys) == 0 {
-			return fmt.Errorf("no public SSH keys found for GitHub actor %q", o.cfg.GitHubActor)
+			return fmt.Errorf("no public SSH keys found for GitHub actor %q; ensure SSH keys are configured at https://github.com/%s.keys", o.cfg.GitHubActor, o.cfg.GitHubActor)
 		}
 		timestamp := time.Now().Unix()
 		for i, key := range keys {
