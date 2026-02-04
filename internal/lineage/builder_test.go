@@ -16,7 +16,7 @@ func TestDockerInstallCommandContainsExpectedContent(t *testing.T) {
 		"curl is required to install Docker; set HETZNER_SERVER_IMAGE to an image that includes curl",
 		"GET_DOCKER_SHA256",
 		"warning: executing unverified installer script",
-		"checksum verification failed",
+		"get.docker.com checksum verification failed",
 		"docker compose plugin is required but not available; reinstall Docker with get.docker.com",
 	}
 	for _, snippet := range expectedSnippets {
