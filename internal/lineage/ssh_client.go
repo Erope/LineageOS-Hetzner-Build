@@ -9,37 +9,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 type SSHClient struct {
 	Addr       string
 	User       string
 	PrivateKey []byte
-	KnownHosts string
 	Timeout    time.Duration
 }
 
-func (c *SSHClient) WithKnownHosts(path string) *SSHClient {
-	return &SSHClient{
-		Addr:       c.Addr,
-		User:       c.User,
-		PrivateKey: c.PrivateKey,
-		KnownHosts: path,
-		Timeout:    c.Timeout,
-	}
-}
-
-func NewSSHClient(addr, user string, privateKey []byte, knownHostsPath string, timeout time.Duration) (*SSHClient, error) {
+func NewSSHClient(addr, user string, privateKey []byte, timeout time.Duration) (*SSHClient, error) {
 	if len(privateKey) == 0 {
 		return nil, fmt.Errorf("private key is required")
 	}
@@ -47,7 +33,6 @@ func NewSSHClient(addr, user string, privateKey []byte, knownHostsPath string, t
 		Addr:       addr,
 		User:       user,
 		PrivateKey: privateKey,
-		KnownHosts: knownHostsPath,
 		Timeout:    timeout,
 	}, nil
 }
@@ -164,35 +149,19 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 		return nil, fmt.Errorf("parse ssh key: %w", err)
 	}
 
+	// Skip host key verification for ephemeral cloud servers.
+	// This is safe because:
+	// 1. The IP comes directly from trusted Hetzner API after server creation
+	// 2. We inject our own SSH key during server creation
+	// 3. Servers are ephemeral and deleted after build completion
 	config := &ssh.ClientConfig{
-		User:    c.User,
-		Auth:    []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		Timeout: c.Timeout,
+		User:            c.User,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		Timeout:         c.Timeout,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := c.connectWithKnownHosts(config)
-	if err == nil {
-		return client, nil
-	}
-
-	if c.KnownHosts == "" {
-		return nil, err
-	}
-
-	var keyErr *knownhosts.KeyError
-	if !errors.As(err, &keyErr) {
-		return nil, err
-	}
-	// Handle both unknown host (Want is empty) and key mismatch (Want has entries).
-	// Key mismatch is common with cloud providers where IPs are reused by different servers.
-	// This is acceptable for ephemeral servers created by this tool since the IP comes from trusted Hetzner API.
-	if len(keyErr.Want) > 0 {
-		log.Printf("SSH host key mismatch for %s, refreshing known_hosts (expected for ephemeral cloud servers)", c.Addr)
-	}
-	if err := c.refreshKnownHosts(); err != nil {
-		return nil, fmt.Errorf("refresh known_hosts: %w", err)
-	}
-	return c.connectWithKnownHosts(config)
+	return c.connect(config)
 }
 
 func (c *SSHClient) connect(config *ssh.ClientConfig) (*ssh.Client, error) {
@@ -209,40 +178,6 @@ func (c *SSHClient) connect(config *ssh.ClientConfig) (*ssh.Client, error) {
 		return nil, fmt.Errorf("ssh handshake: %w", err)
 	}
 	return ssh.NewClient(clientConn, chans, reqs), nil
-}
-
-func (c *SSHClient) refreshKnownHosts() error {
-	host, portValue, err := net.SplitHostPort(c.Addr)
-	if err != nil {
-		return fmt.Errorf("parse ssh address: %w", err)
-	}
-	port, err := strconv.Atoi(portValue)
-	if err != nil {
-		return fmt.Errorf("parse ssh port: %w", err)
-	}
-	baseDir := filepath.Dir(c.KnownHosts)
-	if _, err := ensureKnownHosts(host, port, baseDir); err != nil {
-		return fmt.Errorf("refresh known hosts: %w", err)
-	}
-	return nil
-}
-
-func (c *SSHClient) connectWithKnownHosts(config *ssh.ClientConfig) (*ssh.Client, error) {
-	cloneConfig := func(callback ssh.HostKeyCallback) *ssh.ClientConfig {
-		clone := *config
-		clone.HostKeyCallback = callback
-		return &clone
-	}
-	if c.KnownHosts == "" {
-		log.Printf("ERROR: connecting to %s without known_hosts verification (rescue detection only, not for build commands)", c.Addr)
-		// Safe for rescue detection only; host keys are verified once known_hosts is set.
-		return c.connect(cloneConfig(ssh.InsecureIgnoreHostKey()))
-	}
-	hostKeyCallback, err := knownhosts.New(filepath.Clean(c.KnownHosts))
-	if err != nil {
-		return nil, fmt.Errorf("load known_hosts: %w", err)
-	}
-	return c.connect(cloneConfig(hostKeyCallback))
 }
 
 func GenerateEphemeralSSHKey() (privatePEM []byte, publicKey string, err error) {

@@ -37,7 +37,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("server created: id=%d name=%s ip=%s datacenter=%s", server.ID, server.Name, server.IP, server.Datacenter)
 	defer func() {
+		log.Printf("cleaning up server %d and ssh key %d", server.ID, server.SSHKeyID)
 		if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
 			log.Printf("failed to delete server %d: %v", server.ID, err)
 		}
@@ -47,41 +49,49 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	}()
 
 	progress.Step("wait for server to be running")
+	log.Printf("waiting for server %d to reach running status...", server.ID)
 	if err := o.hetznerClient.WaitForServer(ctx, server.ID); err != nil {
 		return fmt.Errorf("wait for server: %w", err)
 	}
+	log.Printf("server %d is running", server.ID)
 
 	addr := fmt.Sprintf("%s:%d", server.IP, server.SSHPort)
 	progress.Step("wait for SSH to become available")
+	log.Printf("waiting for SSH port on %s...", addr)
 	if err := waitForPort(ctx, addr, 5*time.Minute); err != nil {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
+	log.Printf("SSH port is open on %s", addr)
 
-	// known_hosts is deferred until rescue exit so we can tolerate the rescue host key.
-	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, "", 30*time.Second)
+	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, 30*time.Second)
 	if err != nil {
 		return err
 	}
-	// Rescue mode can persist several minutes while the instance reboots into the final OS.
+
+	// Wait for rescue mode to exit and verify stable SSH connectivity.
+	// The stability check requires the connection to be stable for 2 minutes,
+	// ensuring the OS has fully booted and won't reboot again.
 	const rescueExitTimeout = 8 * time.Minute
-	if err := waitForRescueExit(ctx, sshClient, rescueExitTimeout); err != nil {
+	const stabilityDuration = 2 * time.Minute
+	log.Printf("waiting for rescue system to exit and SSH to stabilize (stability duration: %v)...", stabilityDuration)
+	if err := waitForStableSSH(ctx, sshClient, rescueExitTimeout, stabilityDuration); err != nil {
 		return err
 	}
-	knownHostsPath, err := ensureKnownHosts(server.IP, server.SSHPort, o.cfg.LocalArtifactDir)
-	if err != nil {
-		return err
-	}
-	// Switch to verified host keys now that rescue mode has exited.
-	verifiedClient := sshClient.WithKnownHosts(knownHostsPath)
-	builder := NewBuilder(verifiedClient, o.cfg)
+	log.Printf("SSH connection is stable, system has exited rescue mode")
+
+	builder := NewBuilder(sshClient, o.cfg)
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
 
 	progress.Step("stage source on server")
+	log.Printf("uploading source archive to server...")
 	if err := builder.StageSource(buildCtx, archivePath); err != nil {
 		return err
 	}
+	log.Printf("source staged successfully")
+
 	progress.Step("run build on server")
+	log.Printf("starting build...")
 	result, err := builder.Run(buildCtx)
 	if err != nil {
 		log.Printf("build failed, collecting remote logs")
@@ -91,6 +101,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("build failed: %w", err)
 	}
+	log.Printf("build completed successfully")
 
 	progress.Step("download artifacts")
 	artifacts, err := builder.DownloadArtifacts(ctx, result.Artifacts)
@@ -143,33 +154,85 @@ func saveLogs(cfg Config, logs string) error {
 	return os.WriteFile(path, []byte(logs), 0o600)
 }
 
-func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.Duration) error {
+// waitForStableSSH waits for the system to exit rescue mode and then verifies
+// SSH connectivity is stable for the specified duration. This ensures:
+// 1. The system is not in rescue mode
+// 2. SSH connection is successful multiple times over the stability period
+// 3. The system hostname remains consistent (not rebooting)
+func waitForStableSSH(ctx context.Context, sshClient *SSHClient, timeout, stabilityDuration time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	var lastHostname string
+	var stableStart time.Time
+	const checkInterval = 10 * time.Second
+
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for stable SSH connection")
+		}
+
+		// Try to connect and get hostname
 		hostname, _, hostnameErr := sshClient.Run(ctx, "hostname")
 		if hostnameErr != nil {
-			if time.Now().After(deadline) {
-				return fmt.Errorf("timeout waiting for rescue system to exit")
-			}
-			if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+			log.Printf("SSH connection attempt failed: %v", hostnameErr)
+			stableStart = time.Time{} // Reset stability timer
+			if err := sleepWithContext(ctx, checkInterval); err != nil {
 				return err
 			}
 			continue
 		}
-		// Expect Linux with coreutils df output in Hetzner rescue/ubuntu images.
-		rootFs, _, rootFsErr := sshClient.Run(ctx, "df -T /")
-		if rootFsErr == nil {
-			if !isRescueHostname(hostname) && !isRescueRootFilesystem(rootFs) {
-				return nil
+		hostname = strings.TrimSpace(hostname)
+		log.Printf("SSH connected, hostname=%s", hostname)
+
+		// Check if still in rescue mode
+		if isRescueHostname(hostname) {
+			log.Printf("system still in rescue mode (hostname=%s), waiting...", hostname)
+			stableStart = time.Time{} // Reset stability timer
+			if err := sleepWithContext(ctx, checkInterval); err != nil {
+				return err
 			}
+			continue
 		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for rescue system to exit")
+
+		// Check root filesystem
+		rootFs, _, rootFsErr := sshClient.Run(ctx, "df -T /")
+		if rootFsErr != nil {
+			log.Printf("failed to check root filesystem: %v", rootFsErr)
+			stableStart = time.Time{} // Reset stability timer
+			if err := sleepWithContext(ctx, checkInterval); err != nil {
+				return err
+			}
+			continue
 		}
-		if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+		if isRescueRootFilesystem(rootFs) {
+			log.Printf("system has rescue root filesystem (tmpfs/ramfs), waiting...")
+			stableStart = time.Time{} // Reset stability timer
+			if err := sleepWithContext(ctx, checkInterval); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// System has exited rescue mode, start/continue stability check
+		if stableStart.IsZero() || hostname != lastHostname {
+			if lastHostname != "" && hostname != lastHostname {
+				log.Printf("hostname changed from %s to %s, resetting stability timer", lastHostname, hostname)
+			}
+			stableStart = time.Now()
+			lastHostname = hostname
+			log.Printf("starting stability check for %v (hostname=%s)", stabilityDuration, hostname)
+		}
+
+		stableDuration := time.Since(stableStart)
+		if stableDuration >= stabilityDuration {
+			log.Printf("SSH connection stable for %v, proceeding", stableDuration)
+			return nil
+		}
+
+		log.Printf("SSH stable for %v/%v", stableDuration.Truncate(time.Second), stabilityDuration)
+		if err := sleepWithContext(ctx, checkInterval); err != nil {
 			return err
 		}
 	}
