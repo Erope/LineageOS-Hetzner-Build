@@ -1,0 +1,64 @@
+name: LineageOS Hetzner Build
+description: Run the LineageOS Hetzner build tool as a composite action step.
+inputs:
+  HETZNER_TOKEN:
+    description: Hetzner Cloud API Token
+    required: true
+  HETZNER_SERVER_TYPE:
+    description: Hetzner server type
+    required: false
+  HETZNER_SERVER_LOCATION:
+    description: Hetzner server location
+    required: false
+  HETZNER_SERVER_IMAGE:
+    description: Hetzner server image
+    required: false
+  HETZNER_SERVER_NAME:
+    description: Hetzner server name
+    required: false
+  HETZNER_SERVER_USER_DATA:
+    description: Cloud-init user-data file path
+    required: false
+  HETZNER_SSH_PORT:
+    description: SSH port
+    required: false
+  BUILD_COMPOSE_FILE:
+    description: docker-compose file path
+    required: false
+  BUILD_WORKDIR:
+    description: Working directory on instance
+    required: false
+  ARTIFACT_DIR:
+    description: Remote artifact directory
+    required: false
+  ARTIFACT_PATTERN:
+    description: Artifact file glob
+    required: false
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.x
+    - name: Compile builder
+      shell: bash
+      run: go build -o lineage-builder ./cmd/lineage-builder
+    - name: Run builder
+      shell: bash
+      env:
+        HETZNER_TOKEN: ${{ inputs.HETZNER_TOKEN }}
+        HETZNER_SERVER_TYPE: ${{ inputs.HETZNER_SERVER_TYPE }}
+        HETZNER_SERVER_LOCATION: ${{ inputs.HETZNER_SERVER_LOCATION }}
+        HETZNER_SERVER_IMAGE: ${{ inputs.HETZNER_SERVER_IMAGE }}
+        HETZNER_SERVER_NAME: ${{ inputs.HETZNER_SERVER_NAME }}
+        HETZNER_SERVER_USER_DATA: ${{ inputs.HETZNER_SERVER_USER_DATA }}
+        HETZNER_SSH_PORT: ${{ inputs.HETZNER_SSH_PORT }}
+        BUILD_REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        BUILD_REPO_REF: ${{ github.sha }}
+        GITHUB_TOKEN: ${{ github.token }}
+        BUILD_COMPOSE_FILE: ${{ inputs.BUILD_COMPOSE_FILE }}
+        BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
+        ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
+        ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}
+      run: ./lineage-builder

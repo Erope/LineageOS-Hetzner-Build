@@ -34,13 +34,30 @@ export GITHUB_TOKEN=...
 go run ./cmd/lineage-builder
 ```
 
-## GitHub Actions
+## GitHub Actions (Step 引用)
 
-该程序可直接运行在 GitHub Actions 中，只需提供上述环境变量并确保 Actions 有权限访问 Hetzner 与 GitHub Token。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
+该仓库提供 composite action，可在其他仓库作为单个 step 引入。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
 
-仓库已内置 `.github/workflows/lineage-build.yml`，默认使用 `workflow_dispatch` 手动触发。执行前请在仓库 Secrets 中设置：
+```yaml
+- name: LineageOS Build
+  uses: Erope/LineageOS-Hetzner-Build@<tag-or-sha>
+  with:
+    HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
+    # 以下为可选
+    HETZNER_SERVER_TYPE: cx41
+    HETZNER_SERVER_LOCATION: fsn1
+    HETZNER_SERVER_IMAGE: ubuntu-22.04
+    HETZNER_SERVER_NAME: lineageos-builder
+    HETZNER_SERVER_USER_DATA: ./cloud-init.yml
+    HETZNER_SSH_PORT: 22
+    BUILD_COMPOSE_FILE: docker-compose.yml
+    BUILD_WORKDIR: lineageos-build
+    ARTIFACT_DIR: zips
+    ARTIFACT_PATTERN: "*.zip"
+```
+
+`BUILD_REPO_REF` 会自动使用当前 workflow 的提交 SHA，`GITHUB_TOKEN` 会使用当前仓库默认权限。
+
+执行前请在仓库 Secrets 中设置必要的变量：
 
 - `HETZNER_TOKEN`
-- `BUILD_REPO_URL`
-- `GITHUB_TOKEN`
-- `BUILD_REPO_TOKEN`（可选，仅用于本机拉取私有仓库）

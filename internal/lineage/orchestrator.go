@@ -26,12 +26,15 @@ func NewOrchestrator(cfg Config) *Orchestrator {
 }
 
 func (o *Orchestrator) Run(ctx context.Context) error {
+	progress := newStageLogger(8)
+	progress.Step("prepare repository archive")
 	archivePath, cleanup, err := PrepareRepositoryArchive(ctx, o.cfg)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
+	progress.Step("create Hetzner server")
 	server, err := o.hetznerClient.CreateServer(ctx, o.cfg)
 	if err != nil {
 		return err
@@ -45,11 +48,13 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		}
 	}()
 
+	progress.Step("wait for server to be running")
 	if err := o.hetznerClient.WaitForServer(ctx, server.ID); err != nil {
 		return fmt.Errorf("wait for server: %w", err)
 	}
 
 	addr := fmt.Sprintf("%s:%d", server.IP, server.SSHPort)
+	progress.Step("wait for SSH to become available")
 	if err := waitForPort(ctx, addr, 5*time.Minute); err != nil {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
@@ -67,11 +72,14 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
 
+	progress.Step("stage repository on server")
 	if err := builder.StageRepository(buildCtx, archivePath); err != nil {
 		return err
 	}
+	progress.Step("run build on server")
 	result, err := builder.Run(buildCtx)
 	if err != nil {
+		log.Printf("build failed, collecting remote logs")
 		logs, logErr := builder.SaveRemoteLogs(ctx)
 		if logErr == nil {
 			_ = saveLogs(o.cfg, sanitizeLog(logs))
@@ -79,16 +87,48 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
+	progress.Step("download artifacts")
 	artifacts, err := builder.DownloadArtifacts(ctx, result.Artifacts)
 	if err != nil {
 		return err
 	}
 
+	progress.Step("upload artifacts to GitHub release")
 	if err := o.githubClient.UploadArtifacts(ctx, o.cfg, artifacts); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+type stageLogger struct {
+	total    int
+	current  int
+	barWidth int
+}
+
+func newStageLogger(total int) *stageLogger {
+	return &stageLogger{
+		total:    total,
+		barWidth: 20,
+	}
+}
+
+func (s *stageLogger) Step(message string) {
+	if s.total <= 0 {
+		log.Printf("%s", message)
+		return
+	}
+	if s.current < s.total {
+		s.current++
+	}
+	filled := s.current * s.barWidth / s.total
+	if filled > s.barWidth {
+		filled = s.barWidth
+	}
+	bar := fmt.Sprintf("[%s%s]", strings.Repeat("#", filled), strings.Repeat("-", s.barWidth-filled))
+	percent := s.current * 100 / s.total
+	log.Printf("%s %d/%d %3d%% %s", bar, s.current, s.total, percent, message)
 }
 
 func saveLogs(cfg Config, logs string) error {
