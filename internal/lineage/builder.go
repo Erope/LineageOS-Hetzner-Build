@@ -2,11 +2,11 @@ package lineage
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type BuildResult struct {
@@ -17,13 +17,10 @@ type BuildResult struct {
 type Builder struct {
 	ssh              *SSHClient
 	workDir          string
-	repoURL          string
-	repoRef          string
 	compose          string
 	artifactDir      string
 	artifactPattern  string
 	localArtifactDir string
-	repoToken        string
 	logs             []string
 }
 
@@ -31,13 +28,10 @@ func NewBuilder(ssh *SSHClient, cfg Config) *Builder {
 	return &Builder{
 		ssh:              ssh,
 		workDir:          cfg.WorkingDir,
-		repoURL:          cfg.BuildRepoURL,
-		repoRef:          cfg.BuildRepoRef,
 		compose:          cfg.ComposeFile,
 		artifactDir:      cfg.ArtifactDir,
 		artifactPattern:  cfg.ArtifactPattern,
 		localArtifactDir: cfg.LocalArtifactDir,
-		repoToken:        cfg.BuildRepoToken,
 	}
 }
 
@@ -53,17 +47,8 @@ func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
 }
 
 func (b *Builder) prepare(ctx context.Context) error {
-	cloneCommand, err := b.cloneCommand()
-	if err != nil {
-		return err
-	}
 	commands := []string{
 		"set -euo pipefail",
-		fmt.Sprintf("rm -rf %s", shellQuote(b.workDir)),
-		cloneCommand,
-	}
-	if b.repoRef != "" {
-		commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)), fmt.Sprintf("git checkout %s", shellQuote(b.repoRef)))
 	}
 	commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)))
 	commands = append(commands, "docker compose version || docker-compose --version")
@@ -73,40 +58,27 @@ func (b *Builder) prepare(ctx context.Context) error {
 	return b.runCommand(ctx, command)
 }
 
-func (b *Builder) cloneCommand() (string, error) {
-	if b.repoURL == "" {
-		return "", fmt.Errorf("BUILD_REPO_URL is required")
-	}
-	if strings.TrimSpace(b.repoToken) == "" {
-		return fmt.Sprintf("git clone %s %s", shellQuote(b.repoURL), shellQuote(b.workDir)), nil
-	}
-	repoURL, err := b.normalizeRepoURL(b.repoURL)
+func (b *Builder) StageRepository(ctx context.Context, archivePath string) error {
+	file, err := os.Open(filepath.Clean(archivePath))
 	if err != nil {
-		return "", err
+		return fmt.Errorf("open repository archive: %w", err)
 	}
-	header := b.buildAuthHeader(b.repoToken)
-	return fmt.Sprintf("git -c http.extraheader=%s clone %s %s", shellQuote(header), shellQuote(repoURL), shellQuote(b.workDir)), nil
-}
+	defer file.Close()
 
-func (b *Builder) normalizeRepoURL(repoURL string) (string, error) {
-	if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
-		return repoURL, nil
+	remoteArchive := fmt.Sprintf("/tmp/lineage-repo-%d.tar.gz", time.Now().UnixNano())
+	if err := b.ssh.Upload(ctx, remoteArchive, file, 0o600); err != nil {
+		return fmt.Errorf("upload repository archive: %w", err)
 	}
-	if strings.HasPrefix(repoURL, "git@") {
-		trimmed := strings.TrimPrefix(repoURL, "git@")
-		segments := strings.SplitN(trimmed, ":", 2)
-		if len(segments) != 2 {
-			return "", fmt.Errorf("invalid BUILD_REPO_URL: %s", repoURL)
-		}
-		return fmt.Sprintf("https://%s/%s", segments[0], segments[1]), nil
-	}
-	return "https://" + strings.TrimPrefix(repoURL, "//"), nil
-}
 
-func (b *Builder) buildAuthHeader(token string) string {
-	payload := fmt.Sprintf("x-access-token:%s", strings.TrimSpace(token))
-	encoded := base64.StdEncoding.EncodeToString([]byte(payload))
-	return fmt.Sprintf("AUTHORIZATION: basic %s", encoded)
+	commands := []string{
+		"set -euo pipefail",
+		fmt.Sprintf("rm -rf %s", shellQuote(b.workDir)),
+		fmt.Sprintf("mkdir -p %s", shellQuote(b.workDir)),
+		fmt.Sprintf("tar -xzf %s -C %s", shellQuote(remoteArchive), shellQuote(b.workDir)),
+		fmt.Sprintf("rm -f %s", shellQuote(remoteArchive)),
+	}
+	command := strings.Join(commands, " && ")
+	return b.runCommand(ctx, command)
 }
 
 func (b *Builder) collectArtifacts(ctx context.Context) ([]string, error) {

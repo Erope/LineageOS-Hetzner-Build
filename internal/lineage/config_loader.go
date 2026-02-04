@@ -53,9 +53,6 @@ func LoadConfigFromEnv() (Config, error) {
 	if cfg.GitHubToken == "" {
 		return Config{}, fmt.Errorf("GITHUB_TOKEN is required")
 	}
-	if cfg.BuildRepoToken == "" {
-		cfg.BuildRepoToken = cfg.GitHubToken
-	}
 	host, owner, name, err := parseGitHubRepo(cfg.BuildRepoURL)
 	if err != nil {
 		return Config{}, err
