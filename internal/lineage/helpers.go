@@ -28,9 +28,11 @@ func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
 
 func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir string, timeout time.Duration) (string, error) {
 	const hostKeyStabilityInterval = 5 * time.Second
+	const hostKeyStabilityMatches = 3
 	deadline := time.Now().Add(timeout)
 	var lastKey string
 	var hasLastKey bool
+	consecutiveMatches := 0
 	for {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
@@ -38,12 +40,18 @@ func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir
 		key, err := scanHostKey(host, port)
 		if err == nil {
 			if hasLastKey && key == lastKey {
-				return writeKnownHosts(key, baseDir)
+				consecutiveMatches++
+				if consecutiveMatches >= hostKeyStabilityMatches {
+					return writeKnownHosts(key, baseDir)
+				}
+			} else {
+				consecutiveMatches = 1
 			}
 			lastKey = key
 			hasLastKey = true
 		}
-		if time.Now().After(deadline) {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
 			if lastKey != "" {
 				return writeKnownHosts(lastKey, baseDir)
 			}
@@ -51,6 +59,12 @@ func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir
 				return "", err
 			}
 			return "", fmt.Errorf("timeout waiting for stable SSH host key for %s", host)
+		}
+		if remaining < hostKeyStabilityInterval {
+			if err := sleepWithContext(ctx, remaining); err != nil {
+				return "", err
+			}
+			continue
 		}
 		if err := sleepWithContext(ctx, hostKeyStabilityInterval); err != nil {
 			return "", err
