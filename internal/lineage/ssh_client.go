@@ -29,6 +29,16 @@ type SSHClient struct {
 	Timeout    time.Duration
 }
 
+func (c *SSHClient) WithKnownHosts(path string) *SSHClient {
+	return &SSHClient{
+		Addr:       c.Addr,
+		User:       c.User,
+		PrivateKey: c.PrivateKey,
+		KnownHosts: path,
+		Timeout:    c.Timeout,
+	}
+}
+
 func NewSSHClient(addr, user string, privateKey []byte, knownHostsPath string, timeout time.Duration) (*SSHClient, error) {
 	if len(privateKey) == 0 {
 		return nil, fmt.Errorf("private key is required")
@@ -224,7 +234,7 @@ func (c *SSHClient) connectWithKnownHosts(config *ssh.ClientConfig) (*ssh.Client
 		return &clone
 	}
 	if c.KnownHosts == "" {
-		log.Printf("WARNING: connecting to %s without known_hosts verification (rescue detection only, not for build commands)", c.Addr)
+		log.Printf("ERROR: connecting to %s without known_hosts verification (rescue detection only, not for build commands)", c.Addr)
 		// Safe for rescue detection only; host keys are verified once known_hosts is set.
 		return c.connect(cloneConfig(ssh.InsecureIgnoreHostKey()))
 	}

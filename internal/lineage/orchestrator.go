@@ -71,9 +71,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sshClient.KnownHosts = knownHostsPath
 	// Switch to verified host keys now that rescue mode has exited.
-	builder := NewBuilder(sshClient, o.cfg)
+	verifiedClient := sshClient.WithKnownHosts(knownHostsPath)
+	builder := NewBuilder(verifiedClient, o.cfg)
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
 

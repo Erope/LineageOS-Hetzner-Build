@@ -14,7 +14,7 @@ func TestIsRescueHostname(t *testing.T) {
 	}
 	for hostname, expected := range cases {
 		if isRescueHostname(hostname) != expected {
-			t.Fatalf("hostname %q expected %v", hostname, expected)
+			t.Errorf("hostname %q expected %v", hostname, expected)
 		}
 	}
 }
@@ -28,9 +28,9 @@ tmpfs          tmpfs   3280256       0   3280256   0% /`
 /dev/sda2      ext4   61888508 8869232  49858012  16% /`
 
 	if !isRescueRootFilesystem(rescueOutput) {
-		t.Fatalf("expected rescue filesystem for tmpfs")
+		t.Errorf("expected rescue filesystem for tmpfs")
 	}
 	if isRescueRootFilesystem(normalOutput) {
-		t.Fatalf("did not expect rescue filesystem for ext4")
+		t.Errorf("did not expect rescue filesystem for ext4")
 	}
 }
