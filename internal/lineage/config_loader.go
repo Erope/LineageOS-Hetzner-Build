@@ -105,9 +105,6 @@ func normalizeComposeFilePath(buildSourceDir, composeFile string) (string, error
 }
 
 func normalizeBuildSourceDir(buildSourceDir, workspace string) (string, error) {
-	if buildSourceDir == "" {
-		return "", nil
-	}
 	cleaned := filepath.Clean(buildSourceDir)
 	if filepath.IsAbs(cleaned) {
 		return cleaned, nil

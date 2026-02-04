@@ -134,12 +134,6 @@ func TestNormalizeBuildSourceDir(t *testing.T) {
 		expectErr   bool
 	}{
 		{
-			name:        "empty build source",
-			buildSource: "",
-			workspace:   "/tmp/workspace",
-			expected:    "",
-		},
-		{
 			name:        "absolute build source",
 			buildSource: "/tmp/source",
 			workspace:   "/tmp/workspace",
