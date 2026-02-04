@@ -43,6 +43,7 @@ runs:
         go-version: 1.24.x
     - name: Compile builder
       shell: bash
+      working-directory: ${{ github.action_path }}
       run: go build -o lineage-builder ./cmd/lineage-builder
     - name: Run builder
       shell: bash
@@ -61,4 +62,4 @@ runs:
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
         ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}
-      run: ./lineage-builder
+      run: ${{ github.action_path }}/lineage-builder
