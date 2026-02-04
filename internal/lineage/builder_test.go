@@ -16,6 +16,7 @@ func TestDockerInstallCommandContainsExpectedContent(t *testing.T) {
 		"curl is required to install Docker; set HETZNER_SERVER_IMAGE to an image that includes curl",
 		"GET_DOCKER_SHA256",
 		"warning: executing get.docker.com installer",
+		"docker compose plugin is required but not available",
 	}
 	for _, snippet := range expectedSnippets {
 		if !strings.Contains(command, snippet) {

@@ -86,7 +86,7 @@ install_docker_packages() {
     fi
     echo "${GET_DOCKER_SHA256}  /tmp/get-docker.sh" | sha256sum -c - >/dev/null 2>&1 || { echo 'get.docker.com checksum verification failed' >&2; exit 1; }
   else
-    echo 'warning: executing get.docker.com installer without checksum verification; review the script for production use' >&2
+    echo 'warning: executing get.docker.com installer without checksum verification; set GET_DOCKER_SHA256 in production or review the script first' >&2
   fi
   sh /tmp/get-docker.sh || { echo 'Docker install failed; check network connectivity and repository configuration' >&2; exit 1; }
   rm -f /tmp/get-docker.sh
@@ -99,7 +99,8 @@ docker_compose_available() {
 if ! command -v docker >/dev/null 2>&1; then
   install_docker_packages
 elif ! docker_compose_available; then
-  install_docker_packages
+  echo 'docker compose plugin is required but not available; rerun install or verify Docker installation' >&2
+  exit 1
 fi`)
 }
 
