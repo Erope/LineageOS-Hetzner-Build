@@ -33,11 +33,13 @@ func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir
 	var lastKey string
 	var hasLastKey bool
 	consecutiveMatches := 0
+	var lastErr error
 	for {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
 		key, err := scanHostKey(host, port)
+		lastErr = err
 		if err == nil {
 			if hasLastKey && key == lastKey {
 				consecutiveMatches++
@@ -45,7 +47,7 @@ func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir
 					return writeKnownHosts(key, baseDir)
 				}
 			} else {
-				consecutiveMatches = 1
+				consecutiveMatches = 0
 			}
 			lastKey = key
 			hasLastKey = true
@@ -55,8 +57,8 @@ func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir
 			if lastKey != "" {
 				return writeKnownHosts(lastKey, baseDir)
 			}
-			if err != nil {
-				return "", err
+			if lastErr != nil {
+				return "", lastErr
 			}
 			return "", fmt.Errorf("timeout waiting for stable SSH host key for %s", host)
 		}
