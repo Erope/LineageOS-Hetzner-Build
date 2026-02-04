@@ -11,6 +11,7 @@ const (
 	defaultServerImage    = "ubuntu-22.04"
 	defaultServerName     = "lineageos-builder"
 	defaultComposeFile    = "docker-compose.yml"
+	defaultServiceName    = "build"
 	defaultWorkingDir     = "lineageos-build"
 	defaultSSHPort        = 22
 	defaultTimeoutMins    = 360
@@ -29,6 +30,7 @@ func LoadConfigFromEnv() (Config, error) {
 		ServerUserDataPath:  os.Getenv("HETZNER_SERVER_USER_DATA"),
 		BuildSourceDir:      os.Getenv("BUILD_SOURCE_DIR"),
 		ComposeFile:         envOrDefault("BUILD_COMPOSE_FILE", defaultComposeFile),
+		BuildServiceName:    envOrDefault("BUILD_SERVICE_NAME", defaultServiceName),
 		WorkingDir:          envOrDefault("BUILD_WORKDIR", defaultWorkingDir),
 		ArtifactDir:         envOrDefault("ARTIFACT_DIR", defaultArtifactDir),
 		ArtifactPattern:     envOrDefault("ARTIFACT_PATTERN", defaultArtifactGlob),

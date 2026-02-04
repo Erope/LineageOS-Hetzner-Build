@@ -16,6 +16,9 @@ inputs:
   BUILD_COMPOSE_FILE:
     description: docker-compose file path
     required: false
+  BUILD_SERVICE_NAME:
+    description: docker-compose service name to run
+    required: false
   BUILD_SOURCE_DIR:
     description: Local source directory that contains docker-compose file and dependencies
     required: true
@@ -45,6 +48,7 @@ runs:
         HETZNER_SERVER_IMAGE: ${{ inputs.HETZNER_SERVER_IMAGE }}
         BUILD_SOURCE_DIR: ${{ inputs.BUILD_SOURCE_DIR }}
         BUILD_COMPOSE_FILE: ${{ inputs.BUILD_COMPOSE_FILE }}
+        BUILD_SERVICE_NAME: ${{ inputs.BUILD_SERVICE_NAME }}
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
         ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}

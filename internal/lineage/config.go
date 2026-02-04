@@ -9,6 +9,7 @@ type Config struct {
 	ServerUserDataPath  string
 	BuildSourceDir      string
 	ComposeFile         string
+	BuildServiceName    string
 	WorkingDir          string
 	ArtifactDir         string
 	ArtifactPattern     string

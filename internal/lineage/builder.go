@@ -18,6 +18,7 @@ type Builder struct {
 	ssh              *SSHClient
 	workDir          string
 	compose          string
+	serviceName      string
 	artifactDir      string
 	artifactPattern  string
 	localArtifactDir string
@@ -31,6 +32,7 @@ func NewBuilder(ssh *SSHClient, cfg Config) *Builder {
 		ssh:              ssh,
 		workDir:          cfg.WorkingDir,
 		compose:          cfg.ComposeFile,
+		serviceName:      cfg.BuildServiceName,
 		artifactDir:      cfg.ArtifactDir,
 		artifactPattern:  cfg.ArtifactPattern,
 		localArtifactDir: cfg.LocalArtifactDir,
@@ -69,7 +71,7 @@ func (b *Builder) buildComposeCommand() string {
 	commands = append(commands, "echo '[DIAGNOSE] Current directory after cd:' && pwd && ls -la")
 	commands = append(commands, "docker compose version")
 	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
-	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
+	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from %s", shellQuote(b.compose), shellQuote(b.serviceName)))
 	return strings.Join(commands, " && ")
 }
 
