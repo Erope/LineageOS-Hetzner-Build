@@ -77,3 +77,31 @@ jobs:
 - `HETZNER_TOKEN`
 - `BUILD_REPO_URL`
 - `GITHUB_TOKEN`
+
+## GitHub Actions (Step 引用)
+
+如果你希望把它作为 step 直接引入，可使用此仓库提供的 composite action：
+
+```yaml
+- name: LineageOS Build
+  uses: Erope/LineageOS-Hetzner-Build@<tag-or-sha>
+  with:
+    HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
+    BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # 以下为可选
+    HETZNER_SERVER_TYPE: ${{ secrets.HETZNER_SERVER_TYPE }}
+    HETZNER_SERVER_LOCATION: ${{ secrets.HETZNER_SERVER_LOCATION }}
+    HETZNER_SERVER_IMAGE: ${{ secrets.HETZNER_SERVER_IMAGE }}
+    HETZNER_SERVER_NAME: ${{ secrets.HETZNER_SERVER_NAME }}
+    HETZNER_SERVER_USER_DATA: ${{ secrets.HETZNER_SERVER_USER_DATA }}
+    HETZNER_SSH_PORT: ${{ secrets.HETZNER_SSH_PORT }}
+    BUILD_REPO_REF: ${{ secrets.BUILD_REPO_REF }}
+    BUILD_REPO_TOKEN: ${{ secrets.BUILD_REPO_TOKEN }}
+    BUILD_COMPOSE_FILE: ${{ secrets.BUILD_COMPOSE_FILE }}
+    BUILD_WORKDIR: ${{ secrets.BUILD_WORKDIR }}
+    BUILD_TIMEOUT_MINUTES: ${{ secrets.BUILD_TIMEOUT_MINUTES }}
+    ARTIFACT_DIR: ${{ secrets.ARTIFACT_DIR }}
+    ARTIFACT_PATTERN: ${{ secrets.ARTIFACT_PATTERN }}
+    LOCAL_ARTIFACT_DIR: ${{ secrets.LOCAL_ARTIFACT_DIR }}
+```
