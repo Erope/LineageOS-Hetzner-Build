@@ -151,7 +151,7 @@ func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.D
 		hostname, _, hostErr := sshClient.Run(ctx, "hostname")
 		if hostErr != nil {
 			if time.Now().After(deadline) {
-				return hostErr
+				return fmt.Errorf("timeout waiting for rescue system to exit")
 			}
 			if err := sleepWithContext(ctx, 10*time.Second); err != nil {
 				return err
@@ -166,12 +166,6 @@ func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.D
 			}
 		}
 		if time.Now().After(deadline) {
-			if hostErr != nil {
-				return hostErr
-			}
-			if rootErr != nil {
-				return rootErr
-			}
 			return fmt.Errorf("timeout waiting for rescue system to exit")
 		}
 		if err := sleepWithContext(ctx, 10*time.Second); err != nil {

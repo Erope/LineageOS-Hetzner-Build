@@ -224,7 +224,7 @@ func (c *SSHClient) connectWithKnownHosts(config *ssh.ClientConfig) (*ssh.Client
 		return &clone
 	}
 	if c.KnownHosts == "" {
-		log.Printf("connecting to %s without known_hosts verification (rescue detection only)", c.Addr)
+		log.Printf("connecting to %s without known_hosts verification (rescue detection only, not for build commands)", c.Addr)
 		return c.connect(cloneConfig(ssh.InsecureIgnoreHostKey()))
 	}
 	hostKeyCallback, err := knownhosts.New(filepath.Clean(c.KnownHosts))
