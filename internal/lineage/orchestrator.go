@@ -109,7 +109,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 			if combinedLogs == "" {
 				combinedLogs = strings.TrimSpace(remoteLogs)
 			} else {
-				combinedLogs = strings.TrimSpace(combinedLogs + "\n" + remoteLogs)
+				combinedLogs += "\n" + strings.TrimSpace(remoteLogs)
 			}
 		}
 		if combinedLogs != "" {

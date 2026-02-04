@@ -124,7 +124,13 @@ func (b *Builder) SaveRemoteLogs(ctx context.Context) (string, error) {
 	if stderr != "" {
 		b.logs = append(b.logs, stderr)
 	}
-	return stdout, err
+	if stderr == "" {
+		return stdout, err
+	}
+	if stdout == "" {
+		return stderr, err
+	}
+	return stdout + "\n" + stderr, err
 }
 
 func (b *Builder) joinLogs() string {
