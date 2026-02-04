@@ -15,10 +15,10 @@ type HetznerClient struct {
 	client *hcloud.Client
 }
 
-	type HetznerServer struct {
-		ID         int64
-		Name       string
-		IP         string
+type HetznerServer struct {
+	ID         int64
+	Name       string
+	IP         string
 	SSHUser    string
 	SSHKey     []byte
 	SSHPort    int
