@@ -122,3 +122,70 @@ func TestNormalizeComposeFilePath(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeBuildSourceDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		buildSource string
+		workspace   string
+		expected    string
+		expectErr   bool
+	}{
+		{
+			name:        "empty build source",
+			buildSource: "",
+			workspace:   "/tmp/workspace",
+			expected:    "",
+		},
+		{
+			name:        "absolute build source",
+			buildSource: "/tmp/source",
+			workspace:   "/tmp/workspace",
+			expected:    "/tmp/source",
+		},
+		{
+			name:        "relative build source with workspace",
+			buildSource: "repo",
+			workspace:   "/tmp/workspace",
+			expected:    filepath.Join("/tmp/workspace", "repo"),
+		},
+		{
+			name:        "relative build source without workspace",
+			buildSource: "repo",
+			workspace:   "",
+			expected:    filepath.Join(mustAbsPath(t, "."), "repo"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := normalizeBuildSourceDir(tc.buildSource, tc.workspace)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected error for %s", tc.name)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.expected {
+				t.Fatalf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
+func mustAbsPath(t *testing.T, path string) string {
+	t.Helper()
+
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("failed to resolve abs path: %v", err)
+	}
+	return abs
+}

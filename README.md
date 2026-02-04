@@ -15,7 +15,7 @@
 | `HETZNER_SERVER_NAME` | 实例名称 | `lineageos-builder` |
 | `HETZNER_SERVER_USER_DATA` | Cloud-init user-data 文件路径 | (空) |
 | `HETZNER_SSH_PORT` | SSH 端口 | `22` |
-| `BUILD_SOURCE_DIR` | 本地源目录（包含 docker-compose 与依赖文件） | 必填 |
+| `BUILD_SOURCE_DIR` | 本地源目录（包含 docker-compose 与依赖文件；GitHub Actions 会自动基于 `GITHUB_WORKSPACE` 补全相对路径） | 必填 |
 | `BUILD_COMPOSE_FILE` | docker-compose 文件路径（相对于 `BUILD_SOURCE_DIR`，也可填写该目录内的绝对路径） | `docker-compose.yml` |
 | `BUILD_WORKDIR` | 实例工作目录 | `lineageos-build` |
 | `BUILD_TIMEOUT_MINUTES` | 构建超时时间（分钟） | `360` |

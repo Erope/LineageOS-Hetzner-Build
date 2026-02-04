@@ -45,6 +45,11 @@ func LoadConfigFromEnv() (Config, error) {
 	if cfg.BuildSourceDir == "" {
 		return Config{}, fmt.Errorf("BUILD_SOURCE_DIR is required")
 	}
+	buildSourceDir, err := normalizeBuildSourceDir(cfg.BuildSourceDir, os.Getenv("GITHUB_WORKSPACE"))
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.BuildSourceDir = buildSourceDir
 	composePath, err := normalizeComposeFilePath(cfg.BuildSourceDir, cfg.ComposeFile)
 	if err != nil {
 		return Config{}, err
@@ -97,4 +102,22 @@ func normalizeComposeFilePath(buildSourceDir, composeFile string) (string, error
 		return "", fmt.Errorf("BUILD_COMPOSE_FILE must be within BUILD_SOURCE_DIR")
 	}
 	return rel, nil
+}
+
+func normalizeBuildSourceDir(buildSourceDir, workspace string) (string, error) {
+	if buildSourceDir == "" {
+		return "", nil
+	}
+	cleaned := filepath.Clean(buildSourceDir)
+	if filepath.IsAbs(cleaned) {
+		return cleaned, nil
+	}
+	if workspace != "" {
+		return filepath.Join(workspace, cleaned), nil
+	}
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("resolve BUILD_SOURCE_DIR: %w", err)
+	}
+	return abs, nil
 }
