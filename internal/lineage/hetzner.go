@@ -97,6 +97,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config, extraSSHK
 	sshKeyRefs := make([]*hcloud.SSHKey, 0, 1+len(extraSSHKeys))
 	sshKeyRefs = append(sshKeyRefs, &hcloud.SSHKey{ID: createdKey.ID})
 	for _, keyID := range extraSSHKeys {
+		// Skip invalid key IDs if any were returned by upstream parsing.
 		if keyID == 0 {
 			continue
 		}
