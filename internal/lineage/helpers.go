@@ -51,12 +51,12 @@ func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir
 			if consecutiveMatches >= hostKeyStabilityMatches {
 				return writeKnownHosts(key, baseDir)
 			}
+		} else {
+			consecutiveMatches = 0
+			hasLastKey = false
 		}
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
-			if lastKey != "" {
-				return writeKnownHosts(lastKey, baseDir)
-			}
 			if lastErr != nil {
 				return "", lastErr
 			}
