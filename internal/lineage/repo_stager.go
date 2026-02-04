@@ -97,10 +97,9 @@ func stageSourceDirectory(ctx context.Context, sourceDir, dest string) error {
 	if _, err := os.Stat(sourceDir); err != nil {
 		return fmt.Errorf("check BUILD_SOURCE_DIR: %w", err)
 	}
-	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return fmt.Errorf("create staging dir: %w", err)
-	}
-	return runLocalCommand(ctx, "cp", "-a", filepath.Join(sourceDir, "."), dest)
+	// 使用 -T 选项避免创建多余的子目录
+	// cp -aT 会把 sourceDir 的内容复制到 dest，不会在 dest 下创建 sourceDir 的子目录
+	return runLocalCommand(ctx, "cp", "-aT", sourceDir, dest)
 }
 
 // [DIAGNOSE] listDirectory 打印目录的文件列表
