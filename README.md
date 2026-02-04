@@ -15,10 +15,11 @@
 | `HETZNER_SSH_PORT` | SSH 端口 | `22` |
 | `BUILD_REPO_URL` | docker-lineage-cicd 仓库地址 | 必填 |
 | `BUILD_REPO_REF` | 仓库分支或 tag | (空) |
+| `BUILD_REPO_TOKEN` | 访问私有仓库的 Token（默认复用 `GITHUB_TOKEN`） | (空) |
 | `BUILD_COMPOSE_FILE` | docker-compose 文件路径 | `docker-compose.yml` |
 | `BUILD_WORKDIR` | 实例工作目录 | `lineageos-build` |
 | `BUILD_TIMEOUT_MINUTES` | 构建超时时间（分钟） | `360` |
-| `ARTIFACT_DIR` | 远程产物目录 | `out/target/product` |
+| `ARTIFACT_DIR` | 远程产物目录 | `zips` |
 | `ARTIFACT_PATTERN` | 产物文件匹配 | `*.zip` |
 | `LOCAL_ARTIFACT_DIR` | 本地保存产物目录 | `artifacts` |
 | `GITHUB_TOKEN` | GitHub Token | 必填 |
@@ -35,4 +36,11 @@ go run ./cmd/lineage-builder
 
 ## GitHub Actions
 
-该程序可直接运行在 GitHub Actions 中，只需提供上述环境变量并确保 Actions 有权限访问Hetzner与 GitHub Token。
+该程序可直接运行在 GitHub Actions 中，只需提供上述环境变量并确保 Actions 有权限访问 Hetzner 与 GitHub Token。
+
+仓库已内置 `.github/workflows/lineage-build.yml`，默认使用 `workflow_dispatch` 手动触发。执行前请在仓库 Secrets 中设置：
+
+- `HETZNER_TOKEN`
+- `BUILD_REPO_URL`
+- `GITHUB_TOKEN`
+- `BUILD_REPO_TOKEN`（可选，默认复用 `GITHUB_TOKEN`）

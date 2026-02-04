@@ -16,7 +16,7 @@ const (
 	defaultWorkingDir     = "lineageos-build"
 	defaultSSHPort        = 22
 	defaultTimeoutMins    = 360
-	defaultArtifactDir    = "out/target/product"
+	defaultArtifactDir    = "zips"
 	defaultArtifactGlob   = "*.zip"
 	defaultLocalArtifacts = "artifacts"
 	defaultGitHost        = "github.com"
@@ -32,6 +32,7 @@ func LoadConfigFromEnv() (Config, error) {
 		ServerUserDataPath:  os.Getenv("HETZNER_SERVER_USER_DATA"),
 		BuildRepoURL:        os.Getenv("BUILD_REPO_URL"),
 		BuildRepoRef:        os.Getenv("BUILD_REPO_REF"),
+		BuildRepoToken:      os.Getenv("BUILD_REPO_TOKEN"),
 		BuildRepoSHA:        os.Getenv("GITHUB_SHA"),
 		ComposeFile:         envOrDefault("BUILD_COMPOSE_FILE", defaultComposeFile),
 		WorkingDir:          envOrDefault("BUILD_WORKDIR", defaultWorkingDir),
@@ -51,6 +52,9 @@ func LoadConfigFromEnv() (Config, error) {
 	}
 	if cfg.GitHubToken == "" {
 		return Config{}, fmt.Errorf("GITHUB_TOKEN is required")
+	}
+	if cfg.BuildRepoToken == "" {
+		cfg.BuildRepoToken = cfg.GitHubToken
 	}
 	host, owner, name, err := parseGitHubRepo(cfg.BuildRepoURL)
 	if err != nil {

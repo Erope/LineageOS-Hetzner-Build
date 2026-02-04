@@ -2,6 +2,7 @@ package lineage
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ type Builder struct {
 	artifactDir      string
 	artifactPattern  string
 	localArtifactDir string
+	repoToken        string
 	logs             []string
 }
 
@@ -35,6 +37,7 @@ func NewBuilder(ssh *SSHClient, cfg Config) *Builder {
 		artifactDir:      cfg.ArtifactDir,
 		artifactPattern:  cfg.ArtifactPattern,
 		localArtifactDir: cfg.LocalArtifactDir,
+		repoToken:        cfg.BuildRepoToken,
 	}
 }
 
@@ -50,10 +53,14 @@ func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
 }
 
 func (b *Builder) prepare(ctx context.Context) error {
+	cloneCommand, err := b.cloneCommand()
+	if err != nil {
+		return err
+	}
 	commands := []string{
 		"set -euo pipefail",
 		fmt.Sprintf("rm -rf %s", shellQuote(b.workDir)),
-		fmt.Sprintf("git clone %s %s", shellQuote(b.repoURL), shellQuote(b.workDir)),
+		cloneCommand,
 	}
 	if b.repoRef != "" {
 		commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)), fmt.Sprintf("git checkout %s", shellQuote(b.repoRef)))
@@ -66,8 +73,44 @@ func (b *Builder) prepare(ctx context.Context) error {
 	return b.runCommand(ctx, command)
 }
 
+func (b *Builder) cloneCommand() (string, error) {
+	if b.repoURL == "" {
+		return "", fmt.Errorf("BUILD_REPO_URL is required")
+	}
+	if strings.TrimSpace(b.repoToken) == "" {
+		return fmt.Sprintf("git clone %s %s", shellQuote(b.repoURL), shellQuote(b.workDir)), nil
+	}
+	repoURL, err := b.normalizeRepoURL(b.repoURL)
+	if err != nil {
+		return "", err
+	}
+	header := b.buildAuthHeader(b.repoToken)
+	return fmt.Sprintf("git -c http.extraheader=%s clone %s %s", shellQuote(header), shellQuote(repoURL), shellQuote(b.workDir)), nil
+}
+
+func (b *Builder) normalizeRepoURL(repoURL string) (string, error) {
+	if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
+		return repoURL, nil
+	}
+	if strings.HasPrefix(repoURL, "git@") {
+		trimmed := strings.TrimPrefix(repoURL, "git@")
+		segments := strings.SplitN(trimmed, ":", 2)
+		if len(segments) != 2 {
+			return "", fmt.Errorf("invalid BUILD_REPO_URL: %s", repoURL)
+		}
+		return fmt.Sprintf("https://%s/%s", segments[0], segments[1]), nil
+	}
+	return "https://" + strings.TrimPrefix(repoURL, "//"), nil
+}
+
+func (b *Builder) buildAuthHeader(token string) string {
+	payload := fmt.Sprintf("x-access-token:%s", strings.TrimSpace(token))
+	encoded := base64.StdEncoding.EncodeToString([]byte(payload))
+	return fmt.Sprintf("AUTHORIZATION: basic %s", encoded)
+}
+
 func (b *Builder) collectArtifacts(ctx context.Context) ([]string, error) {
-	command := fmt.Sprintf("cd %s && find %s -maxdepth 1 -type f -name %s -print", shellQuote(b.workDir), shellQuote(b.artifactDir), shellQuote(b.artifactPattern))
+	command := fmt.Sprintf("cd %s && find %s -maxdepth 2 -type f -name %s -print", shellQuote(b.workDir), shellQuote(b.artifactDir), shellQuote(b.artifactPattern))
 	stdout, _, err := b.ssh.Run(ctx, command)
 	b.logs = append(b.logs, stdout)
 	if err != nil {
