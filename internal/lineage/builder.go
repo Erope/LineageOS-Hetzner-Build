@@ -74,8 +74,8 @@ install_docker_packages() {
     echo 'apt-get is required to install Docker; set HETZNER_SERVER_IMAGE to a Debian/Ubuntu image' >&2
     exit 1
   fi
-  apt-get update || { echo 'apt-get update failed' >&2; exit 1; }
-  apt-get install -y --no-install-recommends "$@" || { echo 'apt-get install failed' >&2; exit 1; }
+  apt-get update || { echo 'apt-get update failed; check network connectivity and repository configuration' >&2; exit 1; }
+  apt-get install -y --no-install-recommends "$@" || { echo 'apt-get install failed; check network connectivity and repository configuration' >&2; exit 1; }
 }
 
 docker_compose_available() {
@@ -91,7 +91,7 @@ docker_compose() {
     docker-compose "$@"
     return
   fi
-  echo 'docker compose is required but not installed' >&2
+  echo 'docker compose is required but not available; installation may have failed' >&2
   return 1
 }
 

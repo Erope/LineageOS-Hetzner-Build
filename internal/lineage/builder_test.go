@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestDockerInstallCommandContainsMessages(t *testing.T) {
+func TestDockerInstallCommandContainsExpectedContent(t *testing.T) {
 	t.Parallel()
 
 	command := dockerInstallCommand()
