@@ -16,7 +16,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Printf("configuration loaded for %s/%s", cfg.BuildRepoOwner, cfg.BuildRepoName)
+	log.Printf("configuration loaded for source directory %s", cfg.BuildSourceDir)
 	orchestrator := lineage.NewOrchestrator(cfg)
 	if err := orchestrator.Run(context.Background()); err != nil {
 		log.Printf("build failed: %v", err)

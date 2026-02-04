@@ -13,21 +13,19 @@ import (
 
 type Orchestrator struct {
 	hetznerClient *HetznerClient
-	githubClient  *GitHubReleaseClient
 	cfg           Config
 }
 
 func NewOrchestrator(cfg Config) *Orchestrator {
 	return &Orchestrator{
 		hetznerClient: NewHetznerClient(cfg.HetznerToken),
-		githubClient:  NewGitHubReleaseClient(cfg.GitHubToken),
 		cfg:           cfg,
 	}
 }
 
 func (o *Orchestrator) Run(ctx context.Context) error {
-	progress := newStageLogger(8)
-	progress.Step("prepare repository archive")
+	progress := newStageLogger(7)
+	progress.Step("prepare source archive")
 	archivePath, cleanup, err := PrepareRepositoryArchive(ctx, o.cfg)
 	if err != nil {
 		return err
@@ -72,8 +70,8 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
 
-	progress.Step("stage repository on server")
-	if err := builder.StageRepository(buildCtx, archivePath); err != nil {
+	progress.Step("stage source on server")
+	if err := builder.StageSource(buildCtx, archivePath); err != nil {
 		return err
 	}
 	progress.Step("run build on server")
@@ -92,11 +90,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	progress.Step("upload artifacts to GitHub release")
-	if err := o.githubClient.UploadArtifacts(ctx, o.cfg, artifacts); err != nil {
-		return err
-	}
+	log.Printf("downloaded %d artifacts", len(artifacts))
 
 	return nil
 }

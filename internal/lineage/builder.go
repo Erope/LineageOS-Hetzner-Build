@@ -57,10 +57,10 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	return b.runCommand(ctx, command)
 }
 
-func (b *Builder) StageRepository(ctx context.Context, archivePath string) error {
+func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 	file, err := os.Open(filepath.Clean(archivePath))
 	if err != nil {
-		return fmt.Errorf("open repository archive: %w", err)
+		return fmt.Errorf("open source archive: %w", err)
 	}
 	defer file.Close()
 
@@ -70,7 +70,7 @@ func (b *Builder) StageRepository(ctx context.Context, archivePath string) error
 	}
 	remoteArchive := fmt.Sprintf("/tmp/lineage-repo-%s.tar.gz", suffix)
 	if err := b.ssh.Upload(ctx, remoteArchive, file, 0o600); err != nil {
-		return fmt.Errorf("upload repository archive: %w", err)
+		return fmt.Errorf("upload source archive: %w", err)
 	}
 
 	commands := []string{

@@ -25,6 +25,9 @@ inputs:
   BUILD_COMPOSE_FILE:
     description: docker-compose file path
     required: false
+  BUILD_SOURCE_DIR:
+    description: Local source directory that contains docker-compose file and dependencies
+    required: true
   BUILD_WORKDIR:
     description: Working directory on instance
     required: false
@@ -58,9 +61,7 @@ runs:
         HETZNER_SERVER_NAME: ${{ inputs.HETZNER_SERVER_NAME }}
         HETZNER_SERVER_USER_DATA: ${{ inputs.HETZNER_SERVER_USER_DATA }}
         HETZNER_SSH_PORT: ${{ inputs.HETZNER_SSH_PORT }}
-        BUILD_REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
-        BUILD_REPO_REF: ${{ github.sha }}
-        GITHUB_TOKEN: ${{ github.token }}
+        BUILD_SOURCE_DIR: ${{ inputs.BUILD_SOURCE_DIR }}
         BUILD_COMPOSE_FILE: ${{ inputs.BUILD_COMPOSE_FILE }}
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}

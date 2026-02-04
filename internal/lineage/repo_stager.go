@@ -3,7 +3,6 @@ package lineage
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,8 +11,8 @@ import (
 )
 
 func PrepareRepositoryArchive(ctx context.Context, cfg Config) (string, func(), error) {
-	if cfg.BuildRepoURL == "" {
-		return "", nil, fmt.Errorf("BUILD_REPO_URL is required")
+	if cfg.BuildSourceDir == "" {
+		return "", nil, fmt.Errorf("BUILD_SOURCE_DIR is required")
 	}
 	baseDir := cfg.LocalArtifactDir
 	if baseDir == "" {
@@ -36,7 +35,7 @@ func PrepareRepositoryArchive(ctx context.Context, cfg Config) (string, func(), 
 		_ = os.RemoveAll(stagingDir)
 		_ = os.Remove(archivePath)
 	}
-	if err := cloneRepository(ctx, cfg, stagingDir); err != nil {
+	if err := stageSourceDirectory(ctx, cfg.BuildSourceDir, stagingDir); err != nil {
 		cleanup()
 		return "", nil, err
 	}
@@ -45,31 +44,6 @@ func PrepareRepositoryArchive(ctx context.Context, cfg Config) (string, func(), 
 		return "", nil, err
 	}
 	return archivePath, cleanup, nil
-}
-
-func cloneRepository(ctx context.Context, cfg Config, dest string) error {
-	token := strings.TrimSpace(cfg.BuildRepoToken)
-	repoURL := cfg.BuildRepoURL
-	var args []string
-	if token == "" {
-		args = []string{"clone", repoURL, dest}
-	} else {
-		normalized, err := normalizeRepoURL(repoURL)
-		if err != nil {
-			return err
-		}
-		header := buildAuthHeader(token)
-		args = []string{"-c", fmt.Sprintf("http.extraheader=%s", header), "clone", normalized, dest}
-	}
-	if err := runLocalCommand(ctx, "git", args...); err != nil {
-		return err
-	}
-	if cfg.BuildRepoRef != "" {
-		if err := runLocalCommand(ctx, "git", "-C", dest, "checkout", cfg.BuildRepoRef); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func createRepoArchive(ctx context.Context, sourceDir, archivePath string) error {
@@ -91,23 +65,12 @@ func runLocalCommand(ctx context.Context, name string, args ...string) error {
 	return nil
 }
 
-func normalizeRepoURL(repoURL string) (string, error) {
-	if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
-		return repoURL, nil
+func stageSourceDirectory(ctx context.Context, sourceDir, dest string) error {
+	if _, err := os.Stat(sourceDir); err != nil {
+		return fmt.Errorf("check BUILD_SOURCE_DIR: %w", err)
 	}
-	if strings.HasPrefix(repoURL, "git@") {
-		trimmed := strings.TrimPrefix(repoURL, "git@")
-		segments := strings.SplitN(trimmed, ":", 2)
-		if len(segments) != 2 {
-			return "", fmt.Errorf("invalid BUILD_REPO_URL: %s", repoURL)
-		}
-		return fmt.Sprintf("https://%s/%s", segments[0], segments[1]), nil
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		return fmt.Errorf("create staging dir: %w", err)
 	}
-	return "https://" + strings.TrimPrefix(repoURL, "//"), nil
-}
-
-func buildAuthHeader(token string) string {
-	payload := fmt.Sprintf("x-access-token:%s", token)
-	encoded := base64.StdEncoding.EncodeToString([]byte(payload))
-	return fmt.Sprintf("AUTHORIZATION: basic %s", encoded)
+	return runLocalCommand(ctx, "cp", "-a", filepath.Join(sourceDir, "."), dest)
 }
