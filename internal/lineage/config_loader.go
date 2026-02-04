@@ -94,9 +94,9 @@ func resolveComposePath(sourceDir, composeFile string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve BUILD_COMPOSE_FILE: %w", err)
 	}
-	if relativePath == "." || strings.HasPrefix(relativePath, "..") {
+	if strings.HasPrefix(relativePath, "..") {
 		return "", fmt.Errorf("BUILD_COMPOSE_FILE must be inside BUILD_SOURCE_DIR")
 	}
-	// Normalize to forward slashes for Linux build hosts and shell usage.
+	// Normalize to forward slashes for consistent storage/transmission and shell usage.
 	return filepath.ToSlash(relativePath), nil
 }
