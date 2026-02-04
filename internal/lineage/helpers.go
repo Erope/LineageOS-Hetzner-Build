@@ -105,16 +105,22 @@ func isRescueHostname(hostname string) bool {
 }
 
 func isRescueRootFilesystem(output string) bool {
+	const (
+		// df -T output fields: Filesystem, Type, 1K-blocks, Used, Available, Use%, Mounted on.
+		dfTypeFieldIndex       = 1
+		dfMountPointFieldIndex = 6
+		dfExpectedFieldCount   = 7
+	)
 	output = strings.ToLower(output)
 	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 7 {
+		if len(fields) < dfExpectedFieldCount {
 			continue
 		}
-		if fields[6] != "/" {
+		if fields[dfMountPointFieldIndex] != "/" {
 			continue
 		}
-		fsType := fields[1]
+		fsType := fields[dfTypeFieldIndex]
 		if fsType == "tmpfs" || fsType == "ramfs" {
 			return true
 		}
