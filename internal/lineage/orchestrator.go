@@ -160,7 +160,7 @@ func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.D
 		}
 		// Expect Linux with coreutils df output in Hetzner rescue/ubuntu images.
 		rootFs, _, rootErr := sshClient.Run(ctx, "df -T /")
-		if hostErr == nil && rootErr == nil {
+		if rootErr == nil {
 			if !isRescueHostname(hostname) && !isRescueRootFilesystem(rootFs) {
 				return nil
 			}
