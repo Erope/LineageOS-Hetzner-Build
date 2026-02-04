@@ -26,6 +26,12 @@ func NewOrchestrator(cfg Config) *Orchestrator {
 }
 
 func (o *Orchestrator) Run(ctx context.Context) error {
+	archivePath, cleanup, err := PrepareRepositoryArchive(ctx, o.cfg)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
 	server, err := o.hetznerClient.CreateServer(ctx, o.cfg)
 	if err != nil {
 		return err
@@ -61,6 +67,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
 
+	if err := builder.StageRepository(buildCtx, archivePath); err != nil {
+		return err
+	}
 	result, err := builder.Run(buildCtx)
 	if err != nil {
 		logs, logErr := builder.SaveRemoteLogs(ctx)

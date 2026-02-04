@@ -9,6 +9,7 @@ type Config struct {
 	ServerUserDataPath  string
 	BuildRepoURL        string
 	BuildRepoRef        string
+	BuildRepoToken      string
 	BuildRepoOwner      string
 	BuildRepoName       string
 	BuildRepoHost       string

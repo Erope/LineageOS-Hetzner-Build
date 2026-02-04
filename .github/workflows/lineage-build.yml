@@ -1,0 +1,23 @@
+name: LineageOS Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
+      BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
+      BUILD_REPO_TOKEN: ${{ secrets.BUILD_REPO_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BUILD_REPO_REF: ${{ secrets.BUILD_REPO_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.x
+      - name: Run builder
+        run: go run ./cmd/lineage-builder
