@@ -34,7 +34,7 @@ export GITHUB_TOKEN=...
 go run ./cmd/lineage-builder
 ```
 
-## GitHub Actions（可重用）
+## GitHub Actions (可重用)
 
 该仓库提供可重用的 GitHub Actions 工作流，方便其他仓库直接引用。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
 
