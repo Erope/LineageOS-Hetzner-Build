@@ -67,6 +67,10 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
     echo 'apt-get is required to install Docker' >&2
     exit 1
   fi
+  if [ "$(id -u)" -ne 0 ]; then
+    echo 'root privileges are required to install Docker' >&2
+    exit 1
+  fi
   apt-get update
   apt-get install -y --no-install-recommends docker.io docker-compose-plugin
 fi`)
