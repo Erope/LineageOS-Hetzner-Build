@@ -78,20 +78,16 @@ func normalizeComposeFilePath(buildSourceDir, composeFile string) (string, error
 		return "", nil
 	}
 	cleaned := filepath.Clean(composeFile)
-	if cleaned == "." || cleaned == ".." || strings.HasSuffix(composeFile, string(filepath.Separator)) {
+	if cleaned == "." || cleaned == ".." {
 		return "", fmt.Errorf("BUILD_COMPOSE_FILE must point to a file")
 	}
 	buildAbs, err := filepath.Abs(buildSourceDir)
 	if err != nil {
 		return "", fmt.Errorf("resolve BUILD_SOURCE_DIR: %w", err)
 	}
-	composeAbs := cleaned
-	if !filepath.IsAbs(cleaned) {
-		composeAbs = filepath.Join(buildAbs, cleaned)
-	}
-	composeAbs, err = filepath.Abs(composeAbs)
-	if err != nil {
-		return "", fmt.Errorf("resolve BUILD_COMPOSE_FILE: %w", err)
+	composeAbs := filepath.Join(buildAbs, cleaned)
+	if filepath.IsAbs(cleaned) {
+		composeAbs = cleaned
 	}
 	rel, err := filepath.Rel(buildAbs, composeAbs)
 	if err != nil {
