@@ -62,17 +62,23 @@ func (b *Builder) runCompose(ctx context.Context) error {
 
 func dockerInstallCommand() string {
 	return strings.TrimSpace(`
-if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo 'apt-get is required to install Docker' >&2
-    exit 1
-  fi
+install_docker_packages() {
   if [ "$(id -u)" -ne 0 ]; then
     echo 'root privileges are required to install Docker' >&2
     exit 1
   fi
-  apt-get update
-  apt-get install -y --no-install-recommends docker.io docker-compose-plugin
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo 'apt-get is required to install Docker' >&2
+    exit 1
+  fi
+  apt-get update || { echo 'apt-get update failed' >&2; exit 1; }
+  apt-get install -y --no-install-recommends "$@" || { echo 'apt-get install failed' >&2; exit 1; }
+}
+
+if ! command -v docker >/dev/null 2>&1; then
+  install_docker_packages docker.io docker-compose-plugin
+elif ! docker compose version >/dev/null 2>&1; then
+  install_docker_packages docker-compose-plugin
 fi`)
 }
 
