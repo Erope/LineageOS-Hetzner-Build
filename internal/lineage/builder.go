@@ -57,6 +57,21 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	stdout, stderr, _ := b.ssh.Run(ctx, checkCmd)
 	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Compose file check: stdout=%s stderr=%s", stdout, stderr))
 
+	// 如果未指定 service name，自动检测第一个 service
+	if b.serviceName == "" {
+		b.logDiagnostic("Auto-detecting service name from compose file")
+		detectCmd := fmt.Sprintf("cd %s && docker compose -f %s config --services | head -1", shellQuote(b.workDir), shellQuote(b.compose))
+		detected, _, err := b.ssh.Run(ctx, detectCmd)
+		if err != nil {
+			return fmt.Errorf("failed to detect service name: %w", err)
+		}
+		b.serviceName = strings.TrimSpace(detected)
+		if b.serviceName == "" {
+			return fmt.Errorf("no services found in compose file")
+		}
+		b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Auto-detected service name: %s", b.serviceName))
+	}
+
 	command := b.buildComposeCommand()
 	return b.runCommand(ctx, command)
 }
