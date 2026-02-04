@@ -61,7 +61,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Rescue mode may persist while the instance reboots into the final OS.
+	// Rescue mode can persist several minutes while the instance reboots into the final OS.
 	const rescueExitTimeout = 8 * time.Minute
 	if err := waitForRescueExit(ctx, sshClient, rescueExitTimeout); err != nil {
 		return err

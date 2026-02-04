@@ -108,10 +108,10 @@ func isRescueRootFilesystem(output string) bool {
 	output = strings.ToLower(output)
 	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		if len(fields) < 7 {
 			continue
 		}
-		if fields[len(fields)-1] != "/" {
+		if fields[6] != "/" {
 			continue
 		}
 		fsType := fields[1]
