@@ -2,6 +2,8 @@
 
 该工具用于在 Hetzner Cloud 上启动临时实例，执行 docker-lineage-cicd 构建，并将生成的构建产物下载回本地。工具只负责远程构建与产物拉取，不再包含 Git Release 等后处理逻辑。
 
+构建流程会在实例上检测并安装 Docker 与 Docker Compose 插件（通过 get.docker.com + docker-compose-plugin），以确保 docker compose 可用。
+
 ## 环境变量
 
 | 变量 | 说明 | 默认值 |

@@ -51,6 +51,8 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	commands := []string{
 		"set -euo pipefail",
 	}
+	commands = append(commands, "if ! command -v docker >/dev/null 2>&1; then apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && curl -fsSL https://get.docker.com | sh; fi")
+	commands = append(commands, "if ! docker compose version >/dev/null 2>&1; then apt-get update && apt-get install -y --no-install-recommends docker-compose-plugin; fi")
 	commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)))
 	commands = append(commands, "docker compose version || docker-compose --version")
 	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
