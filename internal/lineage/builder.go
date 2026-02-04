@@ -48,6 +48,11 @@ func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
 }
 
 func (b *Builder) runCompose(ctx context.Context) error {
+	command := b.buildComposeCommand()
+	return b.runCommand(ctx, command)
+}
+
+func (b *Builder) buildComposeCommand() string {
 	commands := []string{
 		"set -euo pipefail",
 	}
@@ -56,8 +61,7 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	commands = append(commands, "docker compose version")
 	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
 	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
-	command := strings.Join(commands, " && ")
-	return b.runCommand(ctx, command)
+	return strings.Join(commands, " && ")
 }
 
 // dockerInstallCommand returns a shell script that ensures Docker and the
@@ -71,7 +75,7 @@ install_docker_packages() {
     exit 1
   fi
   if ! command -v curl >/dev/null 2>&1; then
-    echo 'curl is required to install Docker; set HETZNER_SERVER_IMAGE to a Debian/Ubuntu image that includes curl' >&2
+    echo 'curl is required to install Docker; set HETZNER_SERVER_IMAGE to an image that includes curl' >&2
     exit 1
   fi
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
