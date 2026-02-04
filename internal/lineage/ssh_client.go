@@ -6,11 +6,13 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -156,7 +158,7 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 
 	hostKeyCallback, err := knownhosts.New(filepath.Clean(c.KnownHosts))
 	if err != nil {
-		return nil, fmt.Errorf("load known hosts: %w", err)
+		return nil, fmt.Errorf("load known_hosts: %w", err)
 	}
 
 	config := &ssh.ClientConfig{
@@ -166,6 +168,30 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 		Timeout:         c.Timeout,
 	}
 
+	client, err := c.connect(config)
+	if err == nil {
+		return client, nil
+	}
+
+	var keyErr *knownhosts.KeyError
+	if !errors.As(err, &keyErr) {
+		return nil, err
+	}
+	if len(keyErr.Want) > 0 {
+		return nil, err
+	}
+	if err := c.refreshKnownHosts(); err != nil {
+		return nil, fmt.Errorf("refresh known_hosts for unknown host: %w", err)
+	}
+	hostKeyCallback, err = knownhosts.New(filepath.Clean(c.KnownHosts))
+	if err != nil {
+		return nil, fmt.Errorf("load known_hosts: %w", err)
+	}
+	config.HostKeyCallback = hostKeyCallback
+	return c.connect(config)
+}
+
+func (c *SSHClient) connect(config *ssh.ClientConfig) (*ssh.Client, error) {
 	conn, err := net.DialTimeout("tcp", c.Addr, c.Timeout)
 	if err != nil {
 		return nil, fmt.Errorf("dial tcp: %w", err)
@@ -173,9 +199,28 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 
 	clientConn, chans, reqs, err := ssh.NewClientConn(conn, c.Addr, config)
 	if err != nil {
+		if closeErr := conn.Close(); closeErr != nil {
+			return nil, fmt.Errorf("ssh handshake failed and connection close failed: %w", errors.Join(err, closeErr))
+		}
 		return nil, fmt.Errorf("ssh handshake: %w", err)
 	}
 	return ssh.NewClient(clientConn, chans, reqs), nil
+}
+
+func (c *SSHClient) refreshKnownHosts() error {
+	host, portValue, err := net.SplitHostPort(c.Addr)
+	if err != nil {
+		return fmt.Errorf("parse ssh address: %w", err)
+	}
+	port, err := strconv.Atoi(portValue)
+	if err != nil {
+		return fmt.Errorf("parse ssh port: %w", err)
+	}
+	baseDir := filepath.Dir(c.KnownHosts)
+	if _, err := ensureKnownHosts(host, port, baseDir); err != nil {
+		return fmt.Errorf("refresh known hosts: %w", err)
+	}
+	return nil
 }
 
 func GenerateEphemeralSSHKey() (privatePEM []byte, publicKey string, err error) {
