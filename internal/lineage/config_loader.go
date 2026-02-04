@@ -85,9 +85,9 @@ func normalizeComposeFilePath(buildSourceDir, composeFile string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("resolve BUILD_SOURCE_DIR: %w", err)
 	}
-	composeAbs := filepath.Join(buildAbs, cleaned)
-	if filepath.IsAbs(cleaned) {
-		composeAbs = cleaned
+	composeAbs := cleaned
+	if !filepath.IsAbs(cleaned) {
+		composeAbs = filepath.Join(buildAbs, cleaned)
 	}
 	rel, err := filepath.Rel(buildAbs, composeAbs)
 	if err != nil {
