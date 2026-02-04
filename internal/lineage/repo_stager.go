@@ -66,9 +66,6 @@ func runLocalCommand(ctx context.Context, name string, args ...string) error {
 }
 
 func stageSourceDirectory(ctx context.Context, sourceDir, dest string) error {
-	if sourceDir == "" {
-		return fmt.Errorf("BUILD_SOURCE_DIR is required")
-	}
 	if _, err := os.Stat(sourceDir); err != nil {
 		return fmt.Errorf("check BUILD_SOURCE_DIR: %w", err)
 	}

@@ -1,6 +1,6 @@
 # LineageOS-Hetzner-Build
 
-该工具用于在 Hetzner Cloud 上启动临时实例，执行 docker-lineage-cicd 构建，并将生成的产物下载回本地。工具只负责远程构建与产物拉取，不再包含 Git Release 等后处理逻辑。
+该工具用于在 Hetzner Cloud 上启动临时实例，执行 docker-lineage-cicd 构建，并将生成的构建产物下载回本地。工具只负责远程构建与产物拉取，不再包含 Git Release 等后处理逻辑。
 
 ## 环境变量
 
