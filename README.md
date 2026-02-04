@@ -34,14 +34,44 @@ export GITHUB_TOKEN=...
 go run ./cmd/lineage-builder
 ```
 
-## GitHub Actions
+## GitHub Actions（可复用）
 
-该程序可直接运行在 GitHub Actions 中，只需提供上述环境变量并确保 Actions 有权限访问 Hetzner 与 GitHub Token。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
+该仓库提供可复用的 GitHub Actions 工作流，方便其他仓库直接引用。仓库会在本机（Actions Runner）完成拉取并打包后再传输至 Hetzner。
 
-仓库已内置 `.github/workflows/lineage-build.yml`，默认使用 `workflow_dispatch` 手动触发。执行前请在仓库 Secrets 中设置：
+在你的仓库中新增一个 workflow 文件，例如 `.github/workflows/lineage-build.yml`：
+
+```yaml
+name: LineageOS Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: Erope/LineageOS-Hetzner-Build/.github/workflows/lineage-build-reusable.yml@main
+    secrets:
+      HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
+      BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 以下为可选
+      HETZNER_SERVER_TYPE: ${{ secrets.HETZNER_SERVER_TYPE }}
+      HETZNER_SERVER_LOCATION: ${{ secrets.HETZNER_SERVER_LOCATION }}
+      HETZNER_SERVER_IMAGE: ${{ secrets.HETZNER_SERVER_IMAGE }}
+      HETZNER_SERVER_NAME: ${{ secrets.HETZNER_SERVER_NAME }}
+      HETZNER_SERVER_USER_DATA: ${{ secrets.HETZNER_SERVER_USER_DATA }}
+      HETZNER_SSH_PORT: ${{ secrets.HETZNER_SSH_PORT }}
+      BUILD_REPO_REF: ${{ secrets.BUILD_REPO_REF }}
+      BUILD_REPO_TOKEN: ${{ secrets.BUILD_REPO_TOKEN }}
+      BUILD_COMPOSE_FILE: ${{ secrets.BUILD_COMPOSE_FILE }}
+      BUILD_WORKDIR: ${{ secrets.BUILD_WORKDIR }}
+      BUILD_TIMEOUT_MINUTES: ${{ secrets.BUILD_TIMEOUT_MINUTES }}
+      ARTIFACT_DIR: ${{ secrets.ARTIFACT_DIR }}
+      ARTIFACT_PATTERN: ${{ secrets.ARTIFACT_PATTERN }}
+      LOCAL_ARTIFACT_DIR: ${{ secrets.LOCAL_ARTIFACT_DIR }}
+```
+
+执行前请在仓库 Secrets 中设置必要的变量：
 
 - `HETZNER_TOKEN`
-- `HETZNER_SERVER_TYPE`（可选，覆盖默认实例类型）
 - `BUILD_REPO_URL`
 - `GITHUB_TOKEN`
-- `BUILD_REPO_TOKEN`（可选，仅用于本机拉取私有仓库）

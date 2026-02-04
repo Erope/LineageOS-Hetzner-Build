@@ -1,7 +1,42 @@
-name: LineageOS Build
+name: LineageOS Build (Reusable)
 
 on:
-  workflow_dispatch:
+  workflow_call:
+    secrets:
+      HETZNER_TOKEN:
+        required: true
+      BUILD_REPO_URL:
+        required: true
+      GITHUB_TOKEN:
+        required: true
+      HETZNER_SERVER_TYPE:
+        required: false
+      HETZNER_SERVER_LOCATION:
+        required: false
+      HETZNER_SERVER_IMAGE:
+        required: false
+      HETZNER_SERVER_NAME:
+        required: false
+      HETZNER_SERVER_USER_DATA:
+        required: false
+      HETZNER_SSH_PORT:
+        required: false
+      BUILD_REPO_REF:
+        required: false
+      BUILD_REPO_TOKEN:
+        required: false
+      BUILD_COMPOSE_FILE:
+        required: false
+      BUILD_WORKDIR:
+        required: false
+      BUILD_TIMEOUT_MINUTES:
+        required: false
+      ARTIFACT_DIR:
+        required: false
+      ARTIFACT_PATTERN:
+        required: false
+      LOCAL_ARTIFACT_DIR:
+        required: false
 
 jobs:
   build:
