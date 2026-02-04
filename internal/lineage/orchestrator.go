@@ -24,7 +24,13 @@ func NewOrchestrator(cfg Config) *Orchestrator {
 }
 
 func (o *Orchestrator) Run(ctx context.Context) error {
-	progress := newStageLogger(7)
+	totalSteps := 7
+	if o.cfg.GitHubActions {
+		totalSteps++
+	}
+	progress := newStageLogger(totalSteps)
+	var keepServer bool
+	var injectedKeyIDs []int64
 	progress.Step("prepare source archive")
 	archivePath, cleanup, err := PrepareRepositoryArchive(ctx, o.cfg)
 	if err != nil {
@@ -32,19 +38,57 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	}
 	defer cleanup()
 
+	if o.cfg.GitHubActions {
+		progress.Step("fetch GitHub SSH keys")
+		if o.cfg.GitHubActor == "" {
+			return fmt.Errorf("GITHUB_ACTOR is required when GITHUB_ACTIONS is set")
+		}
+		keys, err := fetchGitHubPublicKeys(ctx, o.cfg.GitHubActor)
+		if err != nil {
+			return err
+		}
+		if len(keys) == 0 {
+			return fmt.Errorf("no public SSH keys found for GitHub actor %q", o.cfg.GitHubActor)
+		}
+		for index, key := range keys {
+			name := fmt.Sprintf("lineage-builder-gh-%s-%d-%d", o.cfg.GitHubActor, time.Now().Unix(), index)
+			createdKey, err := o.hetznerClient.CreateSSHKey(ctx, name, key)
+			if err != nil {
+				return err
+			}
+			injectedKeyIDs = append(injectedKeyIDs, createdKey.ID)
+		}
+		log.Printf("registered %d GitHub SSH key(s) for actor %s", len(injectedKeyIDs), o.cfg.GitHubActor)
+	}
+
 	progress.Step("create Hetzner server")
-	server, err := o.hetznerClient.CreateServer(ctx, o.cfg)
+	server, err := o.hetznerClient.CreateServer(ctx, o.cfg, injectedKeyIDs)
 	if err != nil {
 		return err
 	}
 	log.Printf("server created: id=%d name=%s ip=%s datacenter=%s", server.ID, server.Name, server.IP, server.Datacenter)
+	if o.cfg.GitHubActions && len(injectedKeyIDs) > 0 {
+		log.Printf("GitHub Actions SSH keys injected for actor %s", o.cfg.GitHubActor)
+	}
+	if o.cfg.KeepServerOnFailure {
+		keepServer = true
+	}
 	defer func() {
+		if keepServer {
+			log.Printf("KEEP_SERVER_ON_FAILURE enabled; keeping server %d (ip=%s) for debugging", server.ID, server.IP)
+			return
+		}
 		log.Printf("cleaning up server %d and ssh key %d", server.ID, server.SSHKeyID)
 		if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
 			log.Printf("failed to delete server %d: %v", server.ID, err)
 		}
 		if err := o.hetznerClient.DeleteSSHKey(context.Background(), server.SSHKeyID); err != nil {
 			log.Printf("failed to delete ssh key %d: %v", server.SSHKeyID, err)
+		}
+		for _, keyID := range injectedKeyIDs {
+			if err := o.hetznerClient.DeleteSSHKey(context.Background(), keyID); err != nil {
+				log.Printf("failed to delete ssh key %d: %v", keyID, err)
+			}
 		}
 	}()
 
@@ -123,6 +167,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	}
 	log.Printf("downloaded %d artifacts", len(artifacts))
 
+	keepServer = false
 	return nil
 }
 

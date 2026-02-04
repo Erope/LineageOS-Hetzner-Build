@@ -25,6 +25,27 @@ inputs:
   ARTIFACT_PATTERN:
     description: Artifact file glob
     required: false
+  BUILD_WORKDIR:
+    description: Remote working directory
+    required: false
+  HETZNER_SERVER_NAME:
+    description: Hetzner server name
+    required: false
+  HETZNER_SERVER_USER_DATA:
+    description: Cloud-init user-data file path
+    required: false
+  HETZNER_SSH_PORT:
+    description: SSH port
+    required: false
+  LOCAL_ARTIFACT_DIR:
+    description: Local directory to store artifacts and logs
+    required: false
+  BUILD_TIMEOUT_MINUTES:
+    description: Build timeout in minutes
+    required: false
+  KEEP_SERVER_ON_FAILURE:
+    description: Keep server running after build failure for debugging
+    required: false
 runs:
   using: composite
   steps:
@@ -43,9 +64,15 @@ runs:
         HETZNER_SERVER_TYPE: ${{ inputs.HETZNER_SERVER_TYPE }}
         HETZNER_SERVER_LOCATION: ${{ inputs.HETZNER_SERVER_LOCATION }}
         HETZNER_SERVER_IMAGE: ${{ inputs.HETZNER_SERVER_IMAGE }}
+        HETZNER_SERVER_NAME: ${{ inputs.HETZNER_SERVER_NAME }}
+        HETZNER_SERVER_USER_DATA: ${{ inputs.HETZNER_SERVER_USER_DATA }}
+        HETZNER_SSH_PORT: ${{ inputs.HETZNER_SSH_PORT }}
         BUILD_SOURCE_DIR: ${{ inputs.BUILD_SOURCE_DIR }}
         BUILD_COMPOSE_FILE: ${{ inputs.BUILD_COMPOSE_FILE }}
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
         ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}
+        LOCAL_ARTIFACT_DIR: ${{ inputs.LOCAL_ARTIFACT_DIR }}
+        BUILD_TIMEOUT_MINUTES: ${{ inputs.BUILD_TIMEOUT_MINUTES }}
+        KEEP_SERVER_ON_FAILURE: ${{ inputs.KEEP_SERVER_ON_FAILURE }}
       run: ${{ github.action_path }}/lineage-builder

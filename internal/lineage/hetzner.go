@@ -15,10 +15,10 @@ type HetznerClient struct {
 	client *hcloud.Client
 }
 
-type HetznerServer struct {
-	ID         int64
-	Name       string
-	IP         string
+	type HetznerServer struct {
+		ID         int64
+		Name       string
+		IP         string
 	SSHUser    string
 	SSHKey     []byte
 	SSHPort    int
@@ -26,11 +26,32 @@ type HetznerServer struct {
 	Datacenter string
 }
 
+type HetznerSSHKey struct {
+	ID          int64
+	PublicKey   string
+	Description string
+}
+
 func NewHetznerClient(token string) *HetznerClient {
 	return &HetznerClient{client: hcloud.NewClient(hcloud.WithToken(token))}
 }
 
-func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*HetznerServer, error) {
+func (hc *HetznerClient) CreateSSHKey(ctx context.Context, name, publicKey string) (*HetznerSSHKey, error) {
+	createdKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
+		Name:      name,
+		PublicKey: publicKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create ssh key: %w", err)
+	}
+	return &HetznerSSHKey{
+		ID:          createdKey.ID,
+		PublicKey:   createdKey.PublicKey,
+		Description: createdKey.Name,
+	}, nil
+}
+
+func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config, extraSSHKeys []int64) (*HetznerServer, error) {
 	serverType, _, err := hc.client.ServerType.GetByName(ctx, cfg.ServerType)
 	if err != nil {
 		return nil, fmt.Errorf("get server type: %w", err)
@@ -63,17 +84,23 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	}
 
 	sshKeyName := fmt.Sprintf("lineage-builder-%d", time.Now().Unix())
-	createdKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
-		Name:      sshKeyName,
-		PublicKey: publicKey,
-	})
+	createdKey, err := hc.CreateSSHKey(ctx, sshKeyName, publicKey)
 	if err != nil {
-		return nil, fmt.Errorf("create ssh key: %w", err)
+		return nil, err
 	}
 
 	userData, err := readUserData(cfg.ServerUserDataPath)
 	if err != nil {
 		return nil, err
+	}
+
+	sshKeyRefs := make([]*hcloud.SSHKey, 0, 1+len(extraSSHKeys))
+	sshKeyRefs = append(sshKeyRefs, &hcloud.SSHKey{ID: createdKey.ID})
+	for _, keyID := range extraSSHKeys {
+		if keyID == 0 {
+			continue
+		}
+		sshKeyRefs = append(sshKeyRefs, &hcloud.SSHKey{ID: keyID})
 	}
 
 	request := hcloud.ServerCreateOpts{
@@ -82,7 +109,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		Image:      image,
 		Location:   location,
 		UserData:   userData,
-		SSHKeys:    []*hcloud.SSHKey{createdKey},
+		SSHKeys:    sshKeyRefs,
 	}
 
 	result, _, err := hc.client.Server.Create(ctx, request)

@@ -22,6 +22,9 @@
 | `ARTIFACT_DIR` | 远程产物目录 | `zips` |
 | `ARTIFACT_PATTERN` | 产物文件匹配 | `*.zip` |
 | `LOCAL_ARTIFACT_DIR` | 本地保存产物目录 | `artifacts` |
+| `KEEP_SERVER_ON_FAILURE` | 构建失败后保留实例（输出实例 IP 方便调试） | `false` |
+| `GITHUB_ACTIONS` | GitHub Actions 环境标识（Actions 会自动设置） | (空) |
+| `GITHUB_ACTOR` | GitHub Actions 触发用户（用于注入 SSH 公钥） | (空) |
 
 ## 使用示例
 
@@ -34,7 +37,7 @@ go run ./cmd/lineage-builder
 
 ## GitHub Actions (Step 引用)
 
-该仓库提供 composite action，可在其他仓库作为单个 step 引入。仓库会在本机（Actions Runner）打包源目录后再传输至 Hetzner。
+该仓库提供 composite action，可在其他仓库作为单个 step 引入。仓库会在本机（Actions Runner）打包源目录后再传输至 Hetzner。运行在 GitHub Actions 时会自动获取 `GITHUB_ACTOR` 的公开 SSH 公钥注入到实例，方便失败后直接登录调试（确保你的 GitHub 账户已配置 SSH 公钥）。
 
 ```yaml
 - name: LineageOS Build
@@ -53,6 +56,7 @@ go run ./cmd/lineage-builder
     BUILD_WORKDIR: lineageos-build
     ARTIFACT_DIR: zips
     ARTIFACT_PATTERN: "*.zip"
+    KEEP_SERVER_ON_FAILURE: "true"
 ```
 
 执行前请在仓库 Secrets 中设置必要的变量：

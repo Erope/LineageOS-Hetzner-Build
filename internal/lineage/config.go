@@ -15,4 +15,7 @@ type Config struct {
 	LocalArtifactDir    string
 	SSHPort             int
 	BuildTimeoutMinutes int
+	KeepServerOnFailure bool
+	GitHubActions       bool
+	GitHubActor         string
 }

@@ -35,6 +35,9 @@ func LoadConfigFromEnv() (Config, error) {
 		LocalArtifactDir:    envOrDefault("LOCAL_ARTIFACT_DIR", defaultLocalArtifacts),
 		SSHPort:             envToInt("HETZNER_SSH_PORT", defaultSSHPort),
 		BuildTimeoutMinutes: envToInt("BUILD_TIMEOUT_MINUTES", defaultTimeoutMins),
+		KeepServerOnFailure: envToBool("KEEP_SERVER_ON_FAILURE"),
+		GitHubActions:       envToBool("GITHUB_ACTIONS"),
+		GitHubActor:         os.Getenv("GITHUB_ACTOR"),
 	}
 
 	if cfg.HetznerToken == "" {
@@ -52,6 +55,18 @@ func envOrDefault(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func envToBool(key string) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return false
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false
+	}
+	return parsed
 }
 
 func envToInt(key string, fallback int) int {
