@@ -41,6 +41,7 @@ go run ./cmd/lineage-builder
 仓库已内置 `.github/workflows/lineage-build.yml`，默认使用 `workflow_dispatch` 手动触发。执行前请在仓库 Secrets 中设置：
 
 - `HETZNER_TOKEN`
+- `HETZNER_SERVER_TYPE`（可选，覆盖默认实例类型）
 - `BUILD_REPO_URL`
 - `GITHUB_TOKEN`
 - `BUILD_REPO_TOKEN`（可选，仅用于本机拉取私有仓库）

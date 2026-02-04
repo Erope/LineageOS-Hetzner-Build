@@ -10,6 +10,7 @@ jobs:
       contents: read
     env:
       HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
+      HETZNER_SERVER_TYPE: ${{ secrets.HETZNER_SERVER_TYPE }}
       BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
       BUILD_REPO_TOKEN: ${{ secrets.BUILD_REPO_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
