@@ -34,14 +34,14 @@ func TestRunComposeUsesDockerComposePlugin(t *testing.T) {
 		WorkingDir:  "/tmp/build",
 		ComposeFile: "docker-compose.yml",
 	})
-	command := builder.buildComposeCommand()
+	composeCommand := builder.buildComposeCommand()
 	expectedSnippets := []string{
 		"docker compose version",
 		"docker compose -f 'docker-compose.yml' pull",
 		"docker compose -f 'docker-compose.yml' up --build --abort-on-container-exit --exit-code-from build",
 	}
 	for _, snippet := range expectedSnippets {
-		if !strings.Contains(command, snippet) {
+		if !strings.Contains(composeCommand, snippet) {
 			t.Fatalf("expected compose command to contain %q", snippet)
 		}
 	}
