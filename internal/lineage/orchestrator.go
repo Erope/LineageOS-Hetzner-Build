@@ -98,9 +98,22 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	result, err := builder.Run(buildCtx)
 	if err != nil {
 		log.Printf("build failed, collecting remote logs")
-		logs, logErr := builder.SaveRemoteLogs(ctx)
-		if logErr == nil {
-			_ = saveLogs(o.cfg, sanitizeLog(logs))
+		combinedLogs := strings.TrimSpace(result.Logs)
+		if combinedLogs != "" {
+			log.Printf("remote command logs:\n%s", sanitizeLog(combinedLogs))
+		}
+		remoteLogs, logErr := builder.SaveRemoteLogs(ctx)
+		if logErr != nil {
+			log.Printf("failed to collect remote logs: %v", logErr)
+		} else if strings.TrimSpace(remoteLogs) != "" {
+			if combinedLogs == "" {
+				combinedLogs = strings.TrimSpace(remoteLogs)
+			} else {
+				combinedLogs = strings.TrimSpace(combinedLogs + "\n" + remoteLogs)
+			}
+		}
+		if combinedLogs != "" {
+			_ = saveLogs(o.cfg, sanitizeLog(combinedLogs))
 		}
 		return fmt.Errorf("build failed: %w", err)
 	}

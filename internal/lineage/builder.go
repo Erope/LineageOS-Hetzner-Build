@@ -119,8 +119,11 @@ func (b *Builder) DownloadArtifacts(ctx context.Context, files []string) ([]stri
 
 func (b *Builder) SaveRemoteLogs(ctx context.Context) (string, error) {
 	command := fmt.Sprintf("cd %s && docker compose -f %s logs --no-color", shellQuote(b.workDir), shellQuote(b.compose))
-	stdout, _, err := b.ssh.Run(ctx, command)
+	stdout, stderr, err := b.ssh.Run(ctx, command)
 	b.logs = append(b.logs, stdout)
+	if stderr != "" {
+		b.logs = append(b.logs, stderr)
+	}
 	return stdout, err
 }
 
@@ -129,6 +132,7 @@ func (b *Builder) joinLogs() string {
 }
 
 func (b *Builder) runCommand(ctx context.Context, command string) error {
+	b.logs = append(b.logs, fmt.Sprintf(">>> %s", command))
 	stdout, stderr, err := b.ssh.Run(ctx, command)
 	b.logs = append(b.logs, stdout)
 	if stderr != "" {
