@@ -99,7 +99,7 @@ docker_compose_available() {
 if ! command -v docker >/dev/null 2>&1; then
   install_docker_packages
 elif ! docker_compose_available; then
-  echo 'docker compose plugin is required but not available; reinstall Docker with get.docker.com or install the compose plugin separately' >&2
+  echo 'docker compose plugin is required but not available; reinstall Docker with get.docker.com' >&2
   exit 1
 fi`)
 }
