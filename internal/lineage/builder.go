@@ -48,15 +48,61 @@ func (b *Builder) Run(ctx context.Context) (BuildResult, error) {
 }
 
 func (b *Builder) runCompose(ctx context.Context) error {
+	command := b.buildComposeCommand()
+	return b.runCommand(ctx, command)
+}
+
+func (b *Builder) buildComposeCommand() string {
 	commands := []string{
 		"set -euo pipefail",
 	}
+	commands = append(commands, dockerInstallCommand())
 	commands = append(commands, fmt.Sprintf("cd %s", shellQuote(b.workDir)))
-	commands = append(commands, "docker compose version || docker-compose --version")
+	commands = append(commands, "docker compose version")
 	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
 	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from build", shellQuote(b.compose)))
-	command := strings.Join(commands, " && ")
-	return b.runCommand(ctx, command)
+	return strings.Join(commands, " && ")
+}
+
+// dockerInstallCommand returns a shell script that ensures Docker and the
+// Docker Compose plugin are installed before running the build commands.
+// The script assumes a Debian/Ubuntu-based image with apt-get and root access.
+func dockerInstallCommand() string {
+	return strings.TrimSpace(`
+install_docker_packages() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo 'root privileges are required to install Docker; ensure the build server runs as root' >&2
+    exit 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    echo 'curl is required to install Docker; set HETZNER_SERVER_IMAGE to an image that includes curl' >&2
+    exit 1
+  fi
+  if [ -z "${GET_DOCKER_SHA256:-}" ]; then
+    echo 'warning: executing unverified installer script from get.docker.com; set GET_DOCKER_SHA256 in production to verify the installer' >&2
+  fi
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
+  if [ -n "${GET_DOCKER_SHA256:-}" ]; then
+    if ! command -v sha256sum >/dev/null 2>&1; then
+      echo 'sha256sum is required to verify GET_DOCKER_SHA256; use an image that includes sha256sum or unset GET_DOCKER_SHA256' >&2
+      exit 1
+    fi
+    echo "${GET_DOCKER_SHA256}  /tmp/get-docker.sh" | sha256sum -c - >/dev/null 2>&1 || { echo 'get.docker.com checksum verification failed; verify GET_DOCKER_SHA256 or check the download integrity' >&2; exit 1; }
+  fi
+  sh /tmp/get-docker.sh || { echo 'Docker install failed; check network connectivity and repository configuration' >&2; exit 1; }
+  rm -f /tmp/get-docker.sh
+}
+
+docker_compose_available() {
+  docker compose version >/dev/null 2>&1
+}
+
+if ! command -v docker >/dev/null 2>&1; then
+  install_docker_packages
+elif ! docker_compose_available; then
+  echo 'docker compose plugin is required but not available; install Docker with get.docker.com which includes the compose plugin' >&2
+  exit 1
+fi`)
 }
 
 func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
