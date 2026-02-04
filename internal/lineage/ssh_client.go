@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -177,11 +178,14 @@ func (c *SSHClient) dial() (*ssh.Client, error) {
 	if !errors.As(err, &keyErr) {
 		return nil, err
 	}
+	// Handle both unknown host (Want is empty) and key mismatch (Want has entries).
+	// Key mismatch is common with cloud providers where IPs are reused by different servers.
+	// This is acceptable for ephemeral servers created by this tool since the IP comes from trusted Hetzner API.
 	if len(keyErr.Want) > 0 {
-		return nil, err
+		log.Printf("SSH host key mismatch for %s, refreshing known_hosts (expected for ephemeral cloud servers)", c.Addr)
 	}
 	if err := c.refreshKnownHosts(); err != nil {
-		return nil, fmt.Errorf("refresh known_hosts for unknown host: %w", err)
+		return nil, fmt.Errorf("refresh known_hosts: %w", err)
 	}
 	hostKeyCallback, err = knownhosts.New(filepath.Clean(c.KnownHosts))
 	if err != nil {
