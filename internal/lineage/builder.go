@@ -75,7 +75,15 @@ install_docker_packages() {
     exit 1
   fi
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
-  echo 'running get.docker.com installer; ensure the network path to Docker is trusted' >&2
+  if [ -n "${GET_DOCKER_SHA256:-}" ]; then
+    if ! command -v sha256sum >/dev/null 2>&1; then
+      echo 'sha256sum is required to verify GET_DOCKER_SHA256; install coreutils or unset GET_DOCKER_SHA256' >&2
+      exit 1
+    fi
+    echo "${GET_DOCKER_SHA256}  /tmp/get-docker.sh" | sha256sum -c - >/dev/null 2>&1 || { echo 'get.docker.com checksum verification failed' >&2; exit 1; }
+  else
+    echo 'warning: executing get.docker.com installer without checksum verification; review the script for production use' >&2
+  fi
   sh /tmp/get-docker.sh || { echo 'Docker install failed; check network connectivity and repository configuration' >&2; exit 1; }
   rm -f /tmp/get-docker.sh
 }

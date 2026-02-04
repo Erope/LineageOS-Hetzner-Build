@@ -2,7 +2,7 @@
 
 该工具用于在 Hetzner Cloud 上启动临时实例，执行 docker-lineage-cicd 构建，并将生成的构建产物下载回本地。工具只负责远程构建与产物拉取，不再包含 Git Release 等后处理逻辑。
 
-构建流程会在实例上检测并通过 get.docker.com 脚本安装 Docker 与 Docker Compose 插件（需使用具备 root 权限且包含 curl 的镜像），以确保 docker compose 可用。安装依赖系统默认的 Docker 安装脚本与签名校验；如需自定义镜像或源，请确保 Docker 与 Compose 插件版本兼容且仓库可信。
+构建流程会在实例上检测并通过 get.docker.com 脚本安装 Docker 与 Docker Compose 插件（需使用具备 root 权限且包含 curl 的镜像），以确保 docker compose 可用。可选设置 `GET_DOCKER_SHA256` 用于校验安装脚本；未设置时会提示在生产环境中先审核脚本内容。安装依赖系统默认的 Docker 安装脚本与签名校验；如需自定义镜像或源，请确保 Docker 与 Compose 插件版本兼容且仓库可信。
 
 ## 环境变量
 
