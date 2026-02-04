@@ -68,9 +68,6 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return err
 	}
 	log.Printf("server created: id=%d name=%s ip=%s datacenter=%s", server.ID, server.Name, server.IP, server.Datacenter)
-	if o.cfg.GitHubActions && len(injectedKeyIDs) > 0 {
-		log.Printf("GitHub Actions SSH keys injected for actor %s", o.cfg.GitHubActor)
-	}
 	if o.cfg.KeepServerOnFailure {
 		keepServer = true
 	}
