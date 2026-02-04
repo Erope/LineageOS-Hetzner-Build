@@ -30,7 +30,7 @@ func LoadConfigFromEnv() (Config, error) {
 		ServerUserDataPath:  os.Getenv("HETZNER_SERVER_USER_DATA"),
 		BuildSourceDir:      os.Getenv("BUILD_SOURCE_DIR"),
 		ComposeFile:         envOrDefault("BUILD_COMPOSE_FILE", defaultComposeFile),
-		BuildServiceName:    envOrDefault("BUILD_SERVICE_NAME", defaultServiceName),
+		BuildServiceName:    os.Getenv("BUILD_SERVICE_NAME"),
 		WorkingDir:          envOrDefault("BUILD_WORKDIR", defaultWorkingDir),
 		ArtifactDir:         envOrDefault("ARTIFACT_DIR", defaultArtifactDir),
 		ArtifactPattern:     envOrDefault("ARTIFACT_PATTERN", defaultArtifactGlob),
@@ -45,6 +45,7 @@ func LoadConfigFromEnv() (Config, error) {
 	if cfg.BuildSourceDir == "" {
 		return Config{}, fmt.Errorf("BUILD_SOURCE_DIR is required")
 	}
+
 	return cfg, nil
 }
 
