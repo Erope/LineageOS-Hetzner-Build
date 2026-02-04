@@ -14,12 +14,6 @@ import (
 	"time"
 )
 
-// Require multiple identical scans to avoid transient SSH host keys during rescue boots.
-const hostKeyStabilityMatches = 3
-
-// Overridable for tests; production uses a short interval to detect key changes quickly.
-var hostKeyStabilityInterval = 5 * time.Second
-
 func shellQuote(value string) string {
 	return fmt.Sprintf("'%s'", strings.ReplaceAll(value, "'", "'\\''"))
 }
@@ -30,52 +24,6 @@ func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
 		return "", err
 	}
 	return writeKnownHosts(output, baseDir)
-}
-
-func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir string, timeout time.Duration) (string, error) {
-	deadline := time.Now().Add(timeout)
-	var lastKey string
-	var hasLastKey bool
-	consecutiveMatches := 0
-	var lastErr error
-	for {
-		if ctx.Err() != nil {
-			return "", ctx.Err()
-		}
-		key, err := scanHostKey(host, port)
-		lastErr = err
-		if err == nil {
-			if hasLastKey && key == lastKey {
-				consecutiveMatches++
-			} else {
-				consecutiveMatches = 1
-			}
-			lastKey = key
-			hasLastKey = true
-			if consecutiveMatches >= hostKeyStabilityMatches {
-				return writeKnownHosts(key, baseDir)
-			}
-		} else {
-			consecutiveMatches = 0
-			hasLastKey = false
-		}
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			if lastErr != nil {
-				return "", lastErr
-			}
-			return "", fmt.Errorf("timeout waiting for stable SSH host key for %s", host)
-		}
-		if remaining < hostKeyStabilityInterval {
-			if err := sleepWithContext(ctx, remaining); err != nil {
-				return "", err
-			}
-			continue
-		}
-		if err := sleepWithContext(ctx, hostKeyStabilityInterval); err != nil {
-			return "", err
-		}
-	}
 }
 
 func scanHostKey(host string, port int) (string, error) {
@@ -149,4 +97,22 @@ func randomSuffix() (string, error) {
 		return "", fmt.Errorf("generate random suffix: %w", err)
 	}
 	return hex.EncodeToString(randomBytes), nil
+}
+
+func isRescueHostname(hostname string) bool {
+	hostname = strings.ToLower(strings.TrimSpace(hostname))
+	return hostname == "rescue" || strings.HasPrefix(hostname, "rescue-")
+}
+
+func isRescueRootFilesystem(output string) bool {
+	output = strings.ToLower(output)
+	for _, line := range strings.Split(output, "\n") {
+		if !strings.Contains(line, " /") {
+			continue
+		}
+		if strings.Contains(line, "tmpfs") || strings.Contains(line, "ramfs") {
+			return true
+		}
+	}
+	return false
 }

@@ -57,15 +57,18 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
 
-	knownHostsPath, err := waitForStableKnownHosts(ctx, server.IP, server.SSHPort, o.cfg.LocalArtifactDir, 2*time.Minute)
+	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, "", 30*time.Second)
 	if err != nil {
 		return err
 	}
-	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, knownHostsPath, 30*time.Second)
+	if err := waitForRescueExit(ctx, sshClient, 8*time.Minute); err != nil {
+		return err
+	}
+	knownHostsPath, err := ensureKnownHosts(server.IP, server.SSHPort, o.cfg.LocalArtifactDir)
 	if err != nil {
 		return err
 	}
-
+	sshClient.KnownHosts = knownHostsPath
 	builder := NewBuilder(sshClient, o.cfg)
 	buildCtx, cancel := context.WithTimeout(ctx, time.Duration(o.cfg.BuildTimeoutMinutes)*time.Minute)
 	defer cancel()
@@ -134,6 +137,34 @@ func saveLogs(cfg Config, logs string) error {
 	}
 	path := filepath.Join(cfg.LocalArtifactDir, "build.log")
 	return os.WriteFile(path, []byte(logs), 0o600)
+}
+
+func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		hostname, _, hostErr := sshClient.Run(ctx, "hostname")
+		rootFs, _, rootErr := sshClient.Run(ctx, "df -T /")
+		if hostErr == nil && rootErr == nil {
+			if !isRescueHostname(hostname) && !isRescueRootFilesystem(rootFs) {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			if hostErr != nil {
+				return hostErr
+			}
+			if rootErr != nil {
+				return rootErr
+			}
+			return fmt.Errorf("timeout waiting for rescue system to exit")
+		}
+		if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+			return err
+		}
+	}
 }
 
 func sanitizeLog(input string) string {
