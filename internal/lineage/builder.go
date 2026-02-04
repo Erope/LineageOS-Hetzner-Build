@@ -78,6 +78,9 @@ install_docker_packages() {
     echo 'curl is required to install Docker; set HETZNER_SERVER_IMAGE to an image that includes curl' >&2
     exit 1
   fi
+  if [ -z "${GET_DOCKER_SHA256:-}" ]; then
+    echo 'warning: executing unverified installer script from get.docker.com; set GET_DOCKER_SHA256 in production to verify the installer' >&2
+  fi
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
   if [ -n "${GET_DOCKER_SHA256:-}" ]; then
     if ! command -v sha256sum >/dev/null 2>&1; then
@@ -85,8 +88,6 @@ install_docker_packages() {
       exit 1
     fi
     echo "${GET_DOCKER_SHA256}  /tmp/get-docker.sh" | sha256sum -c - >/dev/null 2>&1 || { echo 'get.docker.com checksum verification failed; verify GET_DOCKER_SHA256 or re-download the installer' >&2; exit 1; }
-  else
-    echo 'warning: executing unverified installer script from get.docker.com; set GET_DOCKER_SHA256 in production to verify the installer' >&2
   fi
   sh /tmp/get-docker.sh || { echo 'Docker install failed; check network connectivity and repository configuration' >&2; exit 1; }
   rm -f /tmp/get-docker.sh
