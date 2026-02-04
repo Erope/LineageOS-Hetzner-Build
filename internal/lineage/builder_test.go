@@ -59,6 +59,12 @@ func TestNormalizeComposeFilePath(t *testing.T) {
 		expectErr   bool
 	}{
 		{
+			name:        "empty compose file",
+			buildSource: "/tmp/source",
+			composeFile: "",
+			expected:    "",
+		},
+		{
 			name:        "default compose file",
 			buildSource: "/tmp/source",
 			composeFile: "docker-compose.yml",
@@ -80,6 +86,18 @@ func TestNormalizeComposeFilePath(t *testing.T) {
 			name:        "compose file outside source dir",
 			buildSource: "/tmp/source",
 			composeFile: "/tmp/other/docker-compose.yml",
+			expectErr:   true,
+		},
+		{
+			name:        "compose file is dot",
+			buildSource: "/tmp/source",
+			composeFile: ".",
+			expectErr:   true,
+		},
+		{
+			name:        "compose file attempts escape",
+			buildSource: "/tmp/source",
+			composeFile: "../docker-compose.yml",
 			expectErr:   true,
 		},
 	}
