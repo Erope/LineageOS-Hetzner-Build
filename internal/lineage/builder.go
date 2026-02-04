@@ -67,11 +67,11 @@ func dockerInstallCommand() string {
 	return strings.TrimSpace(`
 install_docker_packages() {
   if [ "$(id -u)" -ne 0 ]; then
-    echo 'root privileges are required to install Docker; ensure the instance runs as root' >&2
+    echo 'root privileges are required to install Docker; ensure the build instance runs as root' >&2
     exit 1
   fi
   if ! command -v apt-get >/dev/null 2>&1; then
-    echo 'apt-get is required to install Docker; use a Debian/Ubuntu image' >&2
+    echo 'apt-get is required to install Docker; set HETZNER_SERVER_IMAGE to a Debian/Ubuntu image' >&2
     exit 1
   fi
   apt-get update || { echo 'apt-get update failed' >&2; exit 1; }
