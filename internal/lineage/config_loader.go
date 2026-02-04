@@ -64,6 +64,7 @@ func envToBool(key string) bool {
 	}
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
+		fmt.Printf("warning: invalid boolean value for %s: %q\n", key, value)
 		return false
 	}
 	return parsed
