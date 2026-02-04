@@ -48,7 +48,7 @@ on:
 
 jobs:
   build:
-    uses: Erope/LineageOS-Hetzner-Build/.github/workflows/lineage-build-reusable.yml@main
+    uses: Erope/LineageOS-Hetzner-Build/.github/workflows/lineage-build-reusable.yml@v1
     secrets:
       HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
       BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
@@ -69,6 +69,8 @@ jobs:
       ARTIFACT_PATTERN: ${{ secrets.ARTIFACT_PATTERN }}
       LOCAL_ARTIFACT_DIR: ${{ secrets.LOCAL_ARTIFACT_DIR }}
 ```
+
+建议使用固定的 tag 或提交 SHA 以确保可重现性。
 
 执行前请在仓库 Secrets 中设置必要的变量：
 
