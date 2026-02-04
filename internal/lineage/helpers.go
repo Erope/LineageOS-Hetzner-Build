@@ -19,6 +19,43 @@ func shellQuote(value string) string {
 }
 
 func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
+	output, err := scanHostKey(host, port)
+	if err != nil {
+		return "", err
+	}
+	return writeKnownHosts(output, baseDir)
+}
+
+func waitForStableKnownHosts(ctx context.Context, host string, port int, baseDir string, timeout time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
+	var lastKey string
+	for {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		key, err := scanHostKey(host, port)
+		if err == nil {
+			if key == lastKey {
+				return writeKnownHosts(key, baseDir)
+			}
+			lastKey = key
+		}
+		if time.Now().After(deadline) {
+			if lastKey != "" {
+				return writeKnownHosts(lastKey, baseDir)
+			}
+			if err != nil {
+				return "", err
+			}
+			return "", fmt.Errorf("timeout waiting for stable SSH host key for %s", host)
+		}
+		if err := sleepWithContext(ctx, 5*time.Second); err != nil {
+			return "", err
+		}
+	}
+}
+
+func scanHostKey(host string, port int) (string, error) {
 	if !isValidHost(host) {
 		return "", fmt.Errorf("invalid host: %s", host)
 	}
@@ -34,10 +71,14 @@ func ensureKnownHosts(host string, port int, baseDir string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ssh-keyscan failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	output := stdout.String()
-	if strings.TrimSpace(output) == "" {
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
 		return "", fmt.Errorf("ssh-keyscan returned no data for %s", host)
 	}
+	return output, nil
+}
+
+func writeKnownHosts(output string, baseDir string) (string, error) {
 	if baseDir == "" {
 		baseDir = os.TempDir()
 	}

@@ -57,7 +57,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
 
-	knownHostsPath, err := ensureKnownHosts(server.IP, server.SSHPort, o.cfg.LocalArtifactDir)
+	knownHostsPath, err := waitForStableKnownHosts(ctx, server.IP, server.SSHPort, o.cfg.LocalArtifactDir, 2*time.Minute)
 	if err != nil {
 		return err
 	}
