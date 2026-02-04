@@ -6,6 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
       BUILD_REPO_URL: ${{ secrets.BUILD_REPO_URL }}
