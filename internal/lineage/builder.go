@@ -84,7 +84,7 @@ install_docker_packages() {
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || { echo 'failed to download get.docker.com installer' >&2; exit 1; }
   if [ -n "${GET_DOCKER_SHA256:-}" ]; then
     if ! command -v sha256sum >/dev/null 2>&1; then
-      echo 'sha256sum is required to verify GET_DOCKER_SHA256; install coreutils or unset GET_DOCKER_SHA256' >&2
+      echo 'sha256sum is required to verify GET_DOCKER_SHA256; use an image that includes sha256sum or unset GET_DOCKER_SHA256' >&2
       exit 1
     fi
     echo "${GET_DOCKER_SHA256}  /tmp/get-docker.sh" | sha256sum -c - >/dev/null 2>&1 || { echo 'get.docker.com checksum verification failed; verify GET_DOCKER_SHA256 or check the download integrity' >&2; exit 1; }
@@ -100,7 +100,7 @@ docker_compose_available() {
 if ! command -v docker >/dev/null 2>&1; then
   install_docker_packages
 elif ! docker_compose_available; then
-  echo 'docker compose plugin is required but not available; reinstall Docker with get.docker.com' >&2
+  echo 'docker compose plugin is required but not available; install Docker with get.docker.com which includes the compose plugin' >&2
   exit 1
 fi`)
 }

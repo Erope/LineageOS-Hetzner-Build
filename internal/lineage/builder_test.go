@@ -17,7 +17,7 @@ func TestDockerInstallCommandContainsExpectedContent(t *testing.T) {
 		"GET_DOCKER_SHA256",
 		"warning: executing unverified installer script",
 		"get.docker.com checksum verification failed",
-		"docker compose plugin is required but not available; reinstall Docker with get.docker.com",
+		"docker compose plugin is required but not available; install Docker with get.docker.com which includes the compose plugin",
 	}
 	for _, snippet := range expectedSnippets {
 		if !strings.Contains(command, snippet) {
