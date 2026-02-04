@@ -57,6 +57,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
 
+	// known_hosts is deferred until rescue exit so we can tolerate the rescue host key.
 	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, "", 30*time.Second)
 	if err != nil {
 		return err
@@ -148,6 +149,15 @@ func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.D
 			return ctx.Err()
 		}
 		hostname, _, hostErr := sshClient.Run(ctx, "hostname")
+		if hostErr != nil {
+			if time.Now().After(deadline) {
+				return hostErr
+			}
+			if err := sleepWithContext(ctx, 10*time.Second); err != nil {
+				return err
+			}
+			continue
+		}
 		// Expect Linux with coreutils df output in Hetzner rescue/ubuntu images.
 		rootFs, _, rootErr := sshClient.Run(ctx, "df -T /")
 		if hostErr == nil && rootErr == nil {

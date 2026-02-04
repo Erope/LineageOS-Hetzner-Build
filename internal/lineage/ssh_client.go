@@ -218,19 +218,20 @@ func (c *SSHClient) refreshKnownHosts() error {
 }
 
 func (c *SSHClient) connectWithKnownHosts(config *ssh.ClientConfig) (*ssh.Client, error) {
-	if c.KnownHosts == "" {
+	cloneConfig := func(callback ssh.HostKeyCallback) *ssh.ClientConfig {
 		clone := *config
-		clone.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+		clone.HostKeyCallback = callback
+		return &clone
+	}
+	if c.KnownHosts == "" {
 		log.Printf("connecting to %s without known_hosts verification (rescue detection only)", c.Addr)
-		return c.connect(&clone)
+		return c.connect(cloneConfig(ssh.InsecureIgnoreHostKey()))
 	}
 	hostKeyCallback, err := knownhosts.New(filepath.Clean(c.KnownHosts))
 	if err != nil {
 		return nil, fmt.Errorf("load known_hosts: %w", err)
 	}
-	clone := *config
-	clone.HostKeyCallback = hostKeyCallback
-	return c.connect(&clone)
+	return c.connect(cloneConfig(hostKeyCallback))
 }
 
 func GenerateEphemeralSSHKey() (privatePEM []byte, publicKey string, err error) {
