@@ -66,7 +66,7 @@ func dockerInstallCommand() string {
 	return strings.TrimSpace(`
 install_docker_packages() {
   if [ "$(id -u)" -ne 0 ]; then
-    echo 'root privileges are required to install Docker; rerun the build as root' >&2
+    echo 'root privileges are required to install Docker; rerun this build as root' >&2
     exit 1
   fi
   if ! command -v apt-get >/dev/null 2>&1; then
@@ -79,7 +79,7 @@ install_docker_packages() {
 
 if ! command -v docker >/dev/null 2>&1; then
   install_docker_packages docker.io docker-compose-plugin
-elif ! docker compose version >/dev/null 2>&1; then
+elif ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
   install_docker_packages docker-compose-plugin
 fi`)
 }
