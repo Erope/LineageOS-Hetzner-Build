@@ -51,8 +51,8 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 			return fmt.Errorf("no public SSH keys found for GitHub actor %q", o.cfg.GitHubActor)
 		}
 		timestamp := time.Now().Unix()
-		for keyIndex, key := range keys {
-			name := fmt.Sprintf("lineage-builder-gh-%s-%d-%d", o.cfg.GitHubActor, timestamp, keyIndex)
+		for i, key := range keys {
+			name := fmt.Sprintf("lineage-builder-gh-%s-%d-%d", o.cfg.GitHubActor, timestamp, i)
 			createdKey, err := o.hetznerClient.CreateSSHKey(ctx, name, key)
 			if err != nil {
 				return err

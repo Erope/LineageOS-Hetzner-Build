@@ -1,9 +1,6 @@
 package lineage
 
-import (
-	"os"
-	"testing"
-)
+import "testing"
 
 func TestLoadConfigFromEnvKeepServerOnFailure(t *testing.T) {
 	t.Setenv("HETZNER_TOKEN", "token")
@@ -38,9 +35,11 @@ func TestLoadConfigFromEnvGitHubActions(t *testing.T) {
 }
 
 func TestLoadConfigFromEnvDefaults(t *testing.T) {
-	os.Clearenv()
 	t.Setenv("HETZNER_TOKEN", "token")
 	t.Setenv("BUILD_SOURCE_DIR", "/tmp/src")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITHUB_ACTOR", "")
+	t.Setenv("KEEP_SERVER_ON_FAILURE", "")
 
 	cfg, err := LoadConfigFromEnv()
 	if err != nil {

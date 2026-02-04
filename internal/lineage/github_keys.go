@@ -11,6 +11,8 @@ import (
 )
 
 func fetchGitHubPublicKeys(ctx context.Context, actor string) ([]string, error) {
+	const githubAPITimeout = 10 * time.Second
+
 	if actor == "" {
 		return nil, fmt.Errorf("github actor is required")
 	}
@@ -22,7 +24,7 @@ func fetchGitHubPublicKeys(ctx context.Context, actor string) ([]string, error) 
 	}
 	req.Header.Set("Accept", "text/plain")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: githubAPITimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch github keys: %w", err)
