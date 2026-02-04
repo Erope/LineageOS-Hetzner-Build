@@ -14,8 +14,10 @@ import (
 	"time"
 )
 
+// Require multiple identical scans to avoid transient SSH host keys during rescue boots.
 const hostKeyStabilityMatches = 3
 
+// Overridable for tests; production uses a short interval to detect key changes quickly.
 var hostKeyStabilityInterval = 5 * time.Second
 
 func shellQuote(value string) string {
