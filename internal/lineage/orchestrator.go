@@ -126,7 +126,7 @@ func (s *stageLogger) Step(message string) {
 	if filled > s.barWidth {
 		filled = s.barWidth
 	}
-	bar := fmt.Sprintf("[%s%s]", strings.Repeat("█", filled), strings.Repeat("░", s.barWidth-filled))
+	bar := fmt.Sprintf("[%s%s]", strings.Repeat("#", filled), strings.Repeat("-", s.barWidth-filled))
 	percent := s.current * 100 / s.total
 	log.Printf("%s %d/%d %3d%% %s", bar, s.current, s.total, percent, message)
 }
