@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 func fetchGitHubPublicKeys(ctx context.Context, actor string) ([]string, error) {
@@ -21,7 +22,8 @@ func fetchGitHubPublicKeys(ctx context.Context, actor string) ([]string, error) 
 	}
 	req.Header.Set("Accept", "text/plain")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch github keys: %w", err)
 	}

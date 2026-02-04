@@ -2,6 +2,7 @@ package lineage
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 )
@@ -64,7 +65,7 @@ func envToBool(key string) bool {
 	}
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		fmt.Printf("warning: invalid boolean value for %s: %q\n", key, value)
+		log.Printf("warning: invalid boolean value for %s: %q", key, value)
 		return false
 	}
 	return parsed
