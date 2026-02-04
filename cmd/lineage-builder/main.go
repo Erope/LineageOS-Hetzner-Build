@@ -9,12 +9,14 @@ import (
 )
 
 func main() {
+	log.Printf("lineage builder starting")
 	cfg, err := lineage.LoadConfigFromEnv()
 	if err != nil {
 		log.Printf("configuration error: %v", err)
 		os.Exit(1)
 	}
 
+	log.Printf("configuration loaded for %s/%s", cfg.BuildRepoOwner, cfg.BuildRepoName)
 	orchestrator := lineage.NewOrchestrator(cfg)
 	if err := orchestrator.Run(context.Background()); err != nil {
 		log.Printf("build failed: %v", err)
