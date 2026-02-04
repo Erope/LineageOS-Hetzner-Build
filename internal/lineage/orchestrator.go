@@ -69,8 +69,11 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	}
 
 	// Wait for rescue mode to exit and verify stable SSH connectivity.
-	// The stability check requires the connection to be stable for 2 minutes,
+	// The stability check requires the connection to be stable for stabilityDuration,
 	// ensuring the OS has fully booted and won't reboot again.
+	// 8 minutes is enough for Hetzner's rescue system to complete provisioning.
+	// 2 minutes of stability is sufficient to confirm the OS is fully operational
+	// and won't undergo additional reboots (based on observed Hetzner boot patterns).
 	const rescueExitTimeout = 8 * time.Minute
 	const stabilityDuration = 2 * time.Minute
 	log.Printf("waiting for rescue system to exit and SSH to stabilize (stability duration: %v)...", stabilityDuration)
@@ -163,6 +166,9 @@ func waitForStableSSH(ctx context.Context, sshClient *SSHClient, timeout, stabil
 	deadline := time.Now().Add(timeout)
 	var lastHostname string
 	var stableStart time.Time
+	// 10 seconds between checks balances responsiveness with avoiding excessive
+	// connection attempts. This interval is short enough to detect reboots quickly
+	// but long enough to avoid overloading the server during boot.
 	const checkInterval = 10 * time.Second
 
 	for {
