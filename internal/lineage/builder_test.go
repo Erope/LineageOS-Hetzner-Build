@@ -1,6 +1,7 @@
 package lineage
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -44,5 +45,63 @@ func TestRunComposeUsesDockerComposePlugin(t *testing.T) {
 		if !strings.Contains(composeCommand, snippet) {
 			t.Fatalf("expected compose command to contain %q", snippet)
 		}
+	}
+}
+
+func TestNormalizeComposeFilePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		buildSource string
+		composeFile string
+		expected    string
+		expectErr   bool
+	}{
+		{
+			name:        "default compose file",
+			buildSource: "/tmp/source",
+			composeFile: "docker-compose.yml",
+			expected:    "docker-compose.yml",
+		},
+		{
+			name:        "nested compose file",
+			buildSource: "/tmp/source",
+			composeFile: "compose/docker-compose.yml",
+			expected:    filepath.Join("compose", "docker-compose.yml"),
+		},
+		{
+			name:        "absolute compose file inside source dir",
+			buildSource: "/tmp/source",
+			composeFile: "/tmp/source/compose/docker-compose.yml",
+			expected:    filepath.Join("compose", "docker-compose.yml"),
+		},
+		{
+			name:        "compose file outside source dir",
+			buildSource: "/tmp/source",
+			composeFile: "/tmp/other/docker-compose.yml",
+			expectErr:   true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := normalizeComposeFilePath(test.buildSource, test.composeFile)
+			if test.expectErr {
+				if err == nil {
+					t.Fatalf("expected error for %s", test.name)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != test.expected {
+				t.Fatalf("expected %q, got %q", test.expected, got)
+			}
+		})
 	}
 }

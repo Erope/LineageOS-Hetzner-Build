@@ -3,7 +3,9 @@ package lineage
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -43,6 +45,11 @@ func LoadConfigFromEnv() (Config, error) {
 	if cfg.BuildSourceDir == "" {
 		return Config{}, fmt.Errorf("BUILD_SOURCE_DIR is required")
 	}
+	composePath, err := normalizeComposeFilePath(cfg.BuildSourceDir, cfg.ComposeFile)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.ComposeFile = composePath
 	return cfg, nil
 }
 
@@ -64,4 +71,34 @@ func envToInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func normalizeComposeFilePath(buildSourceDir, composeFile string) (string, error) {
+	if composeFile == "" {
+		return "", nil
+	}
+	cleaned := filepath.Clean(composeFile)
+	if cleaned == "." {
+		return "", fmt.Errorf("BUILD_COMPOSE_FILE must point to a file")
+	}
+	buildAbs, err := filepath.Abs(buildSourceDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve BUILD_SOURCE_DIR: %w", err)
+	}
+	composeAbs := cleaned
+	if !filepath.IsAbs(cleaned) {
+		composeAbs = filepath.Join(buildAbs, cleaned)
+	}
+	composeAbs, err = filepath.Abs(composeAbs)
+	if err != nil {
+		return "", fmt.Errorf("resolve BUILD_COMPOSE_FILE: %w", err)
+	}
+	rel, err := filepath.Rel(buildAbs, composeAbs)
+	if err != nil {
+		return "", fmt.Errorf("resolve BUILD_COMPOSE_FILE: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("BUILD_COMPOSE_FILE must be within BUILD_SOURCE_DIR")
+	}
+	return rel, nil
 }
