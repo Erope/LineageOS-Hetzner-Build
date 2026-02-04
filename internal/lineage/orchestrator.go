@@ -149,8 +149,8 @@ func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.D
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		hostname, _, hostErr := sshClient.Run(ctx, "hostname")
-		if hostErr != nil {
+		hostname, _, hostnameErr := sshClient.Run(ctx, "hostname")
+		if hostnameErr != nil {
 			if time.Now().After(deadline) {
 				return fmt.Errorf("timeout waiting for rescue system to exit")
 			}
@@ -160,8 +160,8 @@ func waitForRescueExit(ctx context.Context, sshClient *SSHClient, timeout time.D
 			continue
 		}
 		// Expect Linux with coreutils df output in Hetzner rescue/ubuntu images.
-		rootFs, _, rootErr := sshClient.Run(ctx, "df -T /")
-		if rootErr == nil {
+		rootFs, _, rootFsErr := sshClient.Run(ctx, "df -T /")
+		if rootFsErr == nil {
 			if !isRescueHostname(hostname) && !isRescueRootFilesystem(rootFs) {
 				return nil
 			}
