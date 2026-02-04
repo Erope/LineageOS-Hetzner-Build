@@ -61,7 +61,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := waitForRescueExit(ctx, sshClient, 8*time.Minute); err != nil {
+	// Rescue mode may persist while the instance reboots into the final OS.
+	const rescueExitTimeout = 8 * time.Minute
+	if err := waitForRescueExit(ctx, sshClient, rescueExitTimeout); err != nil {
 		return err
 	}
 	knownHostsPath, err := ensureKnownHosts(server.IP, server.SSHPort, o.cfg.LocalArtifactDir)

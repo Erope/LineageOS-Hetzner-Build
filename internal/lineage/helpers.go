@@ -107,10 +107,15 @@ func isRescueHostname(hostname string) bool {
 func isRescueRootFilesystem(output string) bool {
 	output = strings.ToLower(output)
 	for _, line := range strings.Split(output, "\n") {
-		if !strings.Contains(line, " /") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
 			continue
 		}
-		if strings.Contains(line, "tmpfs") || strings.Contains(line, "ramfs") {
+		if fields[len(fields)-1] != "/" {
+			continue
+		}
+		fsType := fields[1]
+		if fsType == "tmpfs" || fsType == "ramfs" {
 			return true
 		}
 	}

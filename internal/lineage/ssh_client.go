@@ -221,6 +221,7 @@ func (c *SSHClient) connectWithKnownHosts(config *ssh.ClientConfig) (*ssh.Client
 	if c.KnownHosts == "" {
 		clone := *config
 		clone.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+		log.Printf("connecting to %s without known_hosts verification", c.Addr)
 		return c.connect(&clone)
 	}
 	hostKeyCallback, err := knownhosts.New(filepath.Clean(c.KnownHosts))
