@@ -1,19 +1,22 @@
 package lineage
 
 type Config struct {
-	HetznerToken        string
-	ServerType          string
-	ServerLocation      string
-	ServerImage         string
-	ServerName          string
-	ServerUserDataPath  string
-	BuildSourceDir      string
-	ComposeFile         string
-	BuildServiceName    string
-	WorkingDir          string
-	ArtifactDir         string
-	ArtifactPattern     string
-	LocalArtifactDir    string
-	SSHPort             int
-	BuildTimeoutMinutes int
+	HetznerToken         string
+	ServerType           string
+	ServerLocation       string
+	ServerImage          string
+	ServerName           string
+	ServerUserDataPath   string
+	BuildSourceDir       string
+	ComposeFile          string
+	BuildServiceName     string
+	WorkingDir           string
+	ArtifactDir          string
+	ArtifactPattern      string
+	LocalArtifactDir     string
+	SSHPort              int
+	BuildTimeoutMinutes  int
+	KeepServerOnFailure  bool
+	UserSSHKeys          []string
+	ServerStateFile      string
 }

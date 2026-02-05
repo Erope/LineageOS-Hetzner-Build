@@ -22,14 +22,56 @@
 | `ARTIFACT_DIR` | 远程产物目录 | `zips` |
 | `ARTIFACT_PATTERN` | 产物文件匹配 | `*.zip` |
 | `LOCAL_ARTIFACT_DIR` | 本地保存产物目录 | `artifacts` |
+| `KEEP_SERVER_ON_FAILURE` | 失败时保留服务器用于调试（true/false） | `false` |
+| `USER_SSH_KEYS` | 用户 SSH 公钥（逗号分隔），自动注入到服务器 | (空) |
+| `SERVER_STATE_FILE` | 服务器状态文件路径 | `.hetzner-server-state.json` |
 
 ## 使用示例
 
 ```bash
-export HETZNER_TOKEN=... 
+export HETZNER_TOKEN=...
 export BUILD_SOURCE_DIR=/path/to/docker-lineage-cicd
 
 go run ./cmd/lineage-builder
+```
+
+### 失败时保留服务器（调试用）
+
+当构建失败需要登录服务器调试时，可以设置 `KEEP_SERVER_ON_FAILURE=true`：
+
+```bash
+export KEEP_SERVER_ON_FAILURE=true
+export HETZNER_TOKEN=...
+export BUILD_SOURCE_DIR=/path/to/docker-lineage-cicd
+
+go run ./cmd/lineage-builder
+```
+
+如果构建失败，程序会输出服务器信息（ID、IP、SSH 连接命令等），但不会销毁服务器。你可以通过 SSH 连接到服务器进行调试。
+
+**注意：** 服务器会持续计费直到手动销毁！
+
+### 清理保留的服务器
+
+调试完成后，使用 `--cleanup` 参数清理服务器：
+
+```bash
+# 确保 KEEP_SERVER_ON_FAILURE 未设置或为 false
+go run ./cmd/lineage-builder --cleanup
+```
+
+程序会读取状态文件（默认 `.hetzner-server-state.json`），销毁服务器及相关 SSH 密钥。
+
+### 添加 SSH 公钥用于远程访问
+
+程序支持自动将 SSH 公钥注入到服务器，方便你直接 SSH 连接服务器：
+
+1. **GitHub Actions 环境**：程序会自动从 GitHub 获取触发工作流的用户的 SSH 公钥（如有）
+2. **本地环境**：程序会自动读取 `~/.ssh/id_*.pub` 文件
+3. **手动指定**：通过 `USER_SSH_KEYS` 环境变量指定（逗号分隔）
+
+```bash
+export USER_SSH_KEYS="ssh-ed25519 AAAAC3... user@example.com,ssh-rsa AAAAB3... user2@example.com"
 ```
 
 ## GitHub Actions (Step 引用)
