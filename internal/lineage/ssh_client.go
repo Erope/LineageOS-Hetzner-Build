@@ -23,6 +23,8 @@ type SSHClient struct {
 	User       string
 	PrivateKey []byte
 	Timeout    time.Duration
+	Stdout     io.Writer // 可选的实时输出目标（如 os.Stdout）
+	Stderr     io.Writer // 可选的实时错误输出目标
 }
 
 func NewSSHClient(addr, user string, privateKey []byte, timeout time.Duration) (*SSHClient, error) {
@@ -50,10 +52,15 @@ func (c *SSHClient) Run(ctx context.Context, command string) (string, string, er
 	}
 	defer session.Close()
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	session.Stdout = &stdout
-	session.Stderr = &stderr
+	// 创建带实时输出的 buffer
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	stdoutWriter := newLineWriter(stdoutBuf, c.Stdout)
+	stderrWriter := newLineWriter(stderrBuf, c.Stderr)
+
+	session.Stdout = stdoutWriter
+	session.Stderr = stderrWriter
 
 	done := make(chan error, 1)
 	go func() { done <- session.Run(command) }()
@@ -61,12 +68,15 @@ func (c *SSHClient) Run(ctx context.Context, command string) (string, string, er
 	select {
 	case <-ctx.Done():
 		_ = session.Signal(ssh.SIGKILL)
-		return stdout.String(), stderr.String(), ctx.Err()
+		return stdoutBuf.String(), stderrBuf.String(), ctx.Err()
 	case err := <-done:
+		// 确保刷新剩余内容
+		stdoutWriter.flush()
+		stderrWriter.flush()
 		if err != nil {
-			return stdout.String(), stderr.String(), fmt.Errorf("run command: %w", err)
+			return stdoutBuf.String(), stderrBuf.String(), fmt.Errorf("run command: %w", err)
 		}
-		return stdout.String(), stderr.String(), nil
+		return stdoutBuf.String(), stderrBuf.String(), nil
 	}
 }
 
@@ -198,4 +208,62 @@ func GenerateEphemeralSSHKey() (privatePEM []byte, publicKey string, err error) 
 	}
 	publicKey = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPublicKey)))
 	return privatePEM, publicKey, nil
+}
+
+// lineWriter 是一个 io.Writer，它在遇到换行符时实时输出到 out，同时保留所有内容到 buf
+type lineWriter struct {
+	buf    *bytes.Buffer
+	out    io.Writer
+	prefix string
+}
+
+func newLineWriter(buf *bytes.Buffer, out io.Writer) *lineWriter {
+	return &lineWriter{
+		buf:    buf,
+		out:    out,
+		prefix: "",
+	}
+}
+
+func (w *lineWriter) Write(p []byte) (n int, err error) {
+	// 先写入 buffer
+	n, err = w.buf.Write(p)
+	if err != nil {
+		return n, err
+	}
+
+	// 如果没有实时输出目标，直接返回
+	if w.out == nil {
+		return n, nil
+	}
+
+	// 处理前缀（上次未换行的内容）
+	data := w.prefix + string(p)
+	w.prefix = ""
+
+	// 按换行符分割
+	lines := strings.Split(data, "\n")
+
+	// 最后一行如果没有换行符，作为前缀保留
+	if !strings.HasSuffix(data, "\n") {
+		w.prefix = lines[len(lines)-1]
+		lines = lines[:len(lines)-1]
+	}
+
+	// 输出完整的行
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(w.out, line); err != nil {
+			return n, err
+		}
+	}
+
+	return n, nil
+}
+
+// flush 刷新剩余的前缀内容
+func (w *lineWriter) flush() {
+	if w.prefix != "" && w.out != nil {
+		fmt.Fprint(w.out, w.prefix)
+		w.prefix = ""
+	}
 }

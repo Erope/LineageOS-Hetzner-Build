@@ -67,6 +67,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// 设置实时输出到 GitHub Actions 日志
+	sshClient.Stdout = os.Stdout
+	sshClient.Stderr = os.Stderr
 
 	// Wait for rescue mode to exit and verify stable SSH connectivity.
 	// The stability check requires the connection to be stable for stabilityDuration,
