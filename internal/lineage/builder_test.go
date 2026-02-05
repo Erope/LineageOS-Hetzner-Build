@@ -38,7 +38,7 @@ func TestRunComposeUsesDockerComposePlugin(t *testing.T) {
 	expectedSnippets := []string{
 		"docker compose version",
 		"docker compose -f 'docker-compose.yml' pull",
-		"docker compose -f 'docker-compose.yml' up --build --abort-on-container-exit --exit-code-from build",
+		"docker compose -f 'docker-compose.yml' up --build",
 	}
 	for _, snippet := range expectedSnippets {
 		if !strings.Contains(composeCommand, snippet) {

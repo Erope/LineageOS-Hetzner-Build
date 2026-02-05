@@ -3,6 +3,7 @@ package lineage
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,14 +17,15 @@ type HetznerClient struct {
 }
 
 type HetznerServer struct {
-	ID         int64
-	Name       string
-	IP         string
-	SSHUser    string
-	SSHKey     []byte
-	SSHPort    int
-	SSHKeyID   int64
-	Datacenter string
+	ID            int64
+	Name          string
+	IP            string
+	SSHUser       string
+	SSHKey        []byte
+	SSHPort       int
+	SSHKeyID      int64
+	GitHubKeyIDs  []int64
+	Datacenter    string
 }
 
 func NewHetznerClient(token string) *HetznerClient {
@@ -71,6 +73,31 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		return nil, fmt.Errorf("create ssh key: %w", err)
 	}
 
+	// Collect all SSH keys to inject
+	sshKeys := []*hcloud.SSHKey{createdKey}
+	var githubKeyIDs []int64
+
+	// Try to fetch and inject GitHub user SSH keys if in GitHub Actions
+	githubKeys, err := GetGitHubActorSSHKeys(ctx)
+	if err != nil {
+		log.Printf("warning: %v", err)
+	} else if len(githubKeys) > 0 {
+		log.Printf("found %d SSH key(s) from GitHub user, injecting into server for debugging", len(githubKeys))
+		for i, key := range githubKeys {
+			ghKeyName := fmt.Sprintf("github-user-key-%d-%d", time.Now().Unix(), i)
+			ghKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
+				Name:      ghKeyName,
+				PublicKey: key,
+			})
+			if err != nil {
+				log.Printf("warning: failed to create GitHub SSH key %d: %v", i, err)
+				continue
+			}
+			sshKeys = append(sshKeys, ghKey)
+			githubKeyIDs = append(githubKeyIDs, ghKey.ID)
+		}
+	}
+
 	userData, err := readUserData(cfg.ServerUserDataPath)
 	if err != nil {
 		return nil, err
@@ -82,7 +109,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		Image:      image,
 		Location:   location,
 		UserData:   userData,
-		SSHKeys:    []*hcloud.SSHKey{createdKey},
+		SSHKeys:    sshKeys,
 	}
 
 	result, _, err := hc.client.Server.Create(ctx, request)
@@ -102,14 +129,15 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	}
 
 	return &HetznerServer{
-		ID:         server.ID,
-		Name:       server.Name,
-		IP:         ip,
-		SSHUser:    "root",
-		SSHKey:     privateKey,
-		SSHPort:    cfg.SSHPort,
-		SSHKeyID:   createdKey.ID,
-		Datacenter: server.Datacenter.Name,
+		ID:           server.ID,
+		Name:         server.Name,
+		IP:           ip,
+		SSHUser:      "root",
+		SSHKey:       privateKey,
+		SSHPort:      cfg.SSHPort,
+		SSHKeyID:     createdKey.ID,
+		GitHubKeyIDs: githubKeyIDs,
+		Datacenter:   server.Datacenter.Name,
 	}, nil
 }
 
@@ -119,6 +147,18 @@ func (hc *HetznerClient) DeleteServer(ctx context.Context, id int64) error {
 		return fmt.Errorf("delete server: %w", err)
 	}
 	return nil
+}
+
+func (hc *HetznerClient) ServerExists(ctx context.Context, id int64) (bool, error) {
+	server, _, err := hc.client.Server.GetByID(ctx, id)
+	if err != nil {
+		// Check if it's a "not found" error
+		if hcloud.IsError(err, hcloud.ErrorCodeNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("check server existence: %w", err)
+	}
+	return server != nil, nil
 }
 
 func (hc *HetznerClient) DeleteSSHKey(ctx context.Context, id int64) error {

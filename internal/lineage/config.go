@@ -16,4 +16,6 @@ type Config struct {
 	LocalArtifactDir    string
 	SSHPort             int
 	BuildTimeoutMinutes int
+	KeepServerOnFailure bool
+	ServerStatePath     string
 }

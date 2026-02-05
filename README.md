@@ -22,15 +22,64 @@
 | `ARTIFACT_DIR` | 远程产物目录 | `zips` |
 | `ARTIFACT_PATTERN` | 产物文件匹配 | `*.zip` |
 | `LOCAL_ARTIFACT_DIR` | 本地保存产物目录 | `artifacts` |
+| `KEEP_SERVER_ON_FAILURE` | 失败后保留服务器用于调试 | `false` |
+| `SERVER_STATE_PATH` | 服务器状态文件路径 | `.hetzner-server-state.json` |
 
 ## 使用示例
 
 ```bash
-export HETZNER_TOKEN=... 
+export HETZNER_TOKEN=...
 export BUILD_SOURCE_DIR=/path/to/docker-lineage-cicd
 
 go run ./cmd/lineage-builder
 ```
+
+## 失败后保留服务器
+
+当构建过程出现问题时，可以通过设置 `KEEP_SERVER_ON_FAILURE=true` 来保留服务器实例，以便登录调试。启用后，如果任何环节出错，服务器将不会被销毁，并会输出服务器的详细信息：
+
+```bash
+export KEEP_SERVER_ON_FAILURE=true
+go run ./cmd/lineage-builder
+```
+
+失败时会输出类似以下信息：
+
+```
+⚠️  WARNING: Server is being kept alive due to KEEP_SERVER_ON_FAILURE=true
+⚠️  Server details:
+⚠️    ID: 12345678
+⚠️    Name: lineageos-builder
+⚠️    IP: 1.2.3.4
+⚠️    SSH Port: 22
+⚠️    Datacenter: fsn1-dc14
+⚠️  To connect: ssh root@1.2.3.4 -p 22
+⚠️  Server state saved to: .hetzner-server-state.json
+⚠️  To cleanup later, run: lineage-builder --cleanup
+```
+
+## SSH 密钥注入
+
+在 GitHub Actions 环境下运行时，工具会自动获取触发 workflow 的用户的 GitHub SSH 公钥（如果有），并注入到服务器中，方便用户在需要时通过 SSH 连接服务器进行调试。
+
+## 清理残留资源
+
+如果程序异常崩溃，服务器可能不会被释放而持续计费。工具会在创建服务器后将信息保存到状态文件（默认 `.hetzner-server-state.json`）。可以使用 `--cleanup` 参数来清理残留的服务器资源：
+
+```bash
+# 清理保存在状态文件中的服务器
+go run ./cmd/lineage-builder --cleanup
+```
+
+清理命令会：
+1. 读取状态文件中的服务器信息
+2. 检查服务器是否仍然存在
+3. 如果存在且可以删除，则删除服务器和 SSH 密钥
+4. 清理状态文件
+
+注意：
+- 如果状态文件不存在或服务器已被删除，不会抛出异常
+- 只有在服务器存在但删除失败的情况下才会抛出异常
 
 ## GitHub Actions (Step 引用)
 
@@ -53,11 +102,16 @@ go run ./cmd/lineage-builder
     BUILD_WORKDIR: lineageos-build
     ARTIFACT_DIR: zips
     ARTIFACT_PATTERN: "*.zip"
+    KEEP_SERVER_ON_FAILURE: false  # 设置为 true 可在失败时保留服务器
 ```
 
 执行前请在仓库 Secrets 中设置必要的变量：
 
 - `HETZNER_TOKEN`
+
+### GitHub Actions 自动清理
+
+action 配置了自动清理步骤，无论构建是否成功，都会尝试清理残留的服务器资源（当 `KEEP_SERVER_ON_FAILURE` 不为 `true` 时）。这确保了即使构建过程中出现异常，也不会持续计费。
 
 ## 构建完成后的后处理建议
 
