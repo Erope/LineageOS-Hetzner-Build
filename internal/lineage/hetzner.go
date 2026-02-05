@@ -2,6 +2,7 @@ package lineage
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"log"
 	"net"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	hcloud "github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"golang.org/x/crypto/ssh"
 )
 
 type HetznerClient struct {
@@ -17,19 +19,69 @@ type HetznerClient struct {
 }
 
 type HetznerServer struct {
-	ID            int64
-	Name          string
-	IP            string
-	SSHUser       string
-	SSHKey        []byte
-	SSHPort       int
-	SSHKeyID      int64
-	GitHubKeyIDs  []int64
-	Datacenter    string
+	ID                 int64
+	Name               string
+	IP                 string
+	SSHUser            string
+	SSHKey             []byte
+	SSHPort            int
+	SSHKeyID           int64
+	GitHubKeyIDs       []int64
+	GitHubKeyIDsReused []int64 // Keys that were found and reused, not created
+	Datacenter         string
 }
 
 func NewHetznerClient(token string) *HetznerClient {
 	return &HetznerClient{client: hcloud.NewClient(hcloud.WithToken(token))}
+}
+
+// computeSSHKeyFingerprint computes the MD5 fingerprint of an SSH public key
+func computeSSHKeyFingerprint(publicKey string) (string, error) {
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(publicKey))
+	if err != nil {
+		return "", fmt.Errorf("parse public key: %w", err)
+	}
+
+	hash := md5.Sum(pubKey.Marshal())
+	fingerprint := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+		hash[0], hash[1], hash[2], hash[3], hash[4], hash[5], hash[6], hash[7],
+		hash[8], hash[9], hash[10], hash[11], hash[12], hash[13], hash[14], hash[15])
+	return fingerprint, nil
+}
+
+// findOrCreateSSHKey tries to create an SSH key, or finds and returns an existing one if it already exists
+func (hc *HetznerClient) findOrCreateSSHKey(ctx context.Context, name, publicKey string) (*hcloud.SSHKey, bool, error) {
+	// Try to create the key first
+	createdKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
+		Name:      name,
+		PublicKey: publicKey,
+	})
+	if err == nil {
+		return createdKey, false, nil
+	}
+
+	// Check if it's a uniqueness error
+	if hcloud.IsError(err, hcloud.ErrorCodeUniquenessError) {
+		// Key already exists, try to find it by fingerprint
+		fingerprint, fpErr := computeSSHKeyFingerprint(publicKey)
+		if fpErr != nil {
+			return nil, false, fmt.Errorf("compute fingerprint: %w", fpErr)
+		}
+
+		existingKey, _, getErr := hc.client.SSHKey.GetByFingerprint(ctx, fingerprint)
+		if getErr != nil {
+			return nil, false, fmt.Errorf("get existing key by fingerprint: %w", getErr)
+		}
+		if existingKey == nil {
+			return nil, false, fmt.Errorf("key exists but could not be found by fingerprint")
+		}
+
+		log.Printf("SSH key already exists in Hetzner (fingerprint: %s), reusing it", fingerprint)
+		return existingKey, true, nil
+	}
+
+	// Other error
+	return nil, false, fmt.Errorf("create ssh key: %w", err)
 }
 
 func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*HetznerServer, error) {
@@ -76,6 +128,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	// Collect all SSH keys to inject
 	sshKeys := []*hcloud.SSHKey{createdKey}
 	var githubKeyIDs []int64
+	var githubKeyIDsReused []int64
 
 	// Try to fetch and inject GitHub user SSH keys if in GitHub Actions
 	githubKeys, err := GetGitHubActorSSHKeys(ctx)
@@ -84,17 +137,23 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	} else if len(githubKeys) > 0 {
 		log.Printf("found %d SSH key(s) from GitHub user, injecting into server for debugging", len(githubKeys))
 		for i, key := range githubKeys {
+			// Note: Hetzner enforces uniqueness of SSH keys based on the public key
+			// content, not on the key name. This timestamp-based name provides a
+			// human-friendly identifier but does not prevent collisions when the
+			// same public key content already exists. In such cases, findOrCreateSSHKey
+			// will detect the existing key by fingerprint and reuse it.
 			ghKeyName := fmt.Sprintf("github-user-key-%d-%d", time.Now().Unix(), i)
-			ghKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
-				Name:      ghKeyName,
-				PublicKey: key,
-			})
+			ghKey, reused, err := hc.findOrCreateSSHKey(ctx, ghKeyName, key)
 			if err != nil {
-				log.Printf("warning: failed to create GitHub SSH key %d: %v", i, err)
+				log.Printf("warning: failed to add GitHub SSH key %d: %v", i, err)
 				continue
 			}
 			sshKeys = append(sshKeys, ghKey)
-			githubKeyIDs = append(githubKeyIDs, ghKey.ID)
+			if reused {
+				githubKeyIDsReused = append(githubKeyIDsReused, ghKey.ID)
+			} else {
+				githubKeyIDs = append(githubKeyIDs, ghKey.ID)
+			}
 		}
 	}
 
@@ -129,15 +188,16 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	}
 
 	return &HetznerServer{
-		ID:           server.ID,
-		Name:         server.Name,
-		IP:           ip,
-		SSHUser:      "root",
-		SSHKey:       privateKey,
-		SSHPort:      cfg.SSHPort,
-		SSHKeyID:     createdKey.ID,
-		GitHubKeyIDs: githubKeyIDs,
-		Datacenter:   server.Datacenter.Name,
+		ID:                 server.ID,
+		Name:               server.Name,
+		IP:                 ip,
+		SSHUser:            "root",
+		SSHKey:             privateKey,
+		SSHPort:            cfg.SSHPort,
+		SSHKeyID:           createdKey.ID,
+		GitHubKeyIDs:       githubKeyIDs,
+		GitHubKeyIDsReused: githubKeyIDsReused,
+		Datacenter:         server.Datacenter.Name,
 	}, nil
 }
 

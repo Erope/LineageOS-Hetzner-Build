@@ -53,7 +53,7 @@ func CleanupPersistedServer(ctx context.Context, cfg Config) error {
 		}
 	}
 
-	// Delete GitHub user SSH keys if present
+	// Delete GitHub user SSH keys if present (only those we created, not reused ones)
 	for _, keyID := range state.GitHubKeyIDs {
 		log.Printf("deleting GitHub SSH key %d...", keyID)
 		if err := hetznerClient.DeleteSSHKey(ctx, keyID); err != nil {
@@ -61,6 +61,11 @@ func CleanupPersistedServer(ctx context.Context, cfg Config) error {
 		} else {
 			log.Printf("successfully deleted GitHub SSH key %d", keyID)
 		}
+	}
+
+	// Log reused keys but do not delete them (they may be used by other projects)
+	if len(state.GitHubKeyIDsReused) > 0 {
+		log.Printf("skipping deletion of %d reused GitHub SSH key(s) (they may be used by other projects)", len(state.GitHubKeyIDsReused))
 	}
 
 	// Clean up state file
