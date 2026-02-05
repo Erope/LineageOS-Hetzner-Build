@@ -86,7 +86,8 @@ func (b *Builder) buildComposeCommand() string {
 	commands = append(commands, "echo '[DIAGNOSE] Current directory after cd:' && pwd && ls -la")
 	commands = append(commands, "docker compose version")
 	commands = append(commands, fmt.Sprintf("docker compose -f %s pull", shellQuote(b.compose)))
-	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build --abort-on-container-exit --exit-code-from %s", shellQuote(b.compose), shellQuote(b.serviceName)))
+	// 实时打印日志并保留退出码：用 tee 输出到 stdout 同时保存到文件，PIPESTATUS[0] 获取 docker compose 的退出码
+	commands = append(commands, fmt.Sprintf("docker compose -f %s up --build 2>&1 | tee /tmp/docker-compose.log; exit ${PIPESTATUS[0]}", shellQuote(b.compose)))
 	return strings.Join(commands, " && ")
 }
 
