@@ -267,6 +267,6 @@ func (b *Builder) runCommand(ctx context.Context, command string) error {
 // [DIAGNOSE] logDiagnostic 打印诊断日志
 func (b *Builder) logDiagnostic(msg string) {
 	logMsg := fmt.Sprintf("[DIAGNOSE] %s", msg)
-	log.Printf(logMsg)
+	log.Printf("%s", logMsg)
 	b.logs = append(b.logs, logMsg)
 }
