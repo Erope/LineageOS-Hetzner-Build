@@ -49,12 +49,18 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 
 	defer func() {
 		if shouldDeleteServer {
-			log.Printf("cleaning up server %d and ssh key %d", server.ID, server.SSHKeyID)
+			log.Printf("cleaning up server %d and ssh keys", server.ID)
 			if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
 				log.Printf("failed to delete server %d: %v", server.ID, err)
 			}
 			if err := o.hetznerClient.DeleteSSHKey(context.Background(), server.SSHKeyID); err != nil {
 				log.Printf("failed to delete ssh key %d: %v", server.SSHKeyID, err)
+			}
+			// Delete GitHub user SSH keys
+			for _, keyID := range server.GitHubKeyIDs {
+				if err := o.hetznerClient.DeleteSSHKey(context.Background(), keyID); err != nil {
+					log.Printf("failed to delete GitHub SSH key %d: %v", keyID, err)
+				}
 			}
 			// Clean up state file after successful deletion
 			if err := DeleteServerState(o.cfg.ServerStatePath); err != nil {

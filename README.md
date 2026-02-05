@@ -78,7 +78,6 @@ go run ./cmd/lineage-builder --cleanup
 4. 清理状态文件
 
 注意：
-- 如果设置了 `KEEP_SERVER_ON_FAILURE=true`，清理命令不会执行
 - 如果状态文件不存在或服务器已被删除，不会抛出异常
 - 只有在服务器存在但删除失败的情况下才会抛出异常
 

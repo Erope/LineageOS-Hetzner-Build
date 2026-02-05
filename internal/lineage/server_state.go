@@ -9,23 +9,25 @@ import (
 
 // ServerState represents the persisted state of a Hetzner server
 type ServerState struct {
-	ServerID   int64  `json:"server_id"`
-	ServerName string `json:"server_name"`
-	ServerIP   string `json:"server_ip"`
-	SSHKeyID   int64  `json:"ssh_key_id"`
-	SSHPort    int    `json:"ssh_port"`
-	Datacenter string `json:"datacenter"`
+	ServerID     int64   `json:"server_id"`
+	ServerName   string  `json:"server_name"`
+	ServerIP     string  `json:"server_ip"`
+	SSHKeyID     int64   `json:"ssh_key_id"`
+	GitHubKeyIDs []int64 `json:"github_key_ids,omitempty"`
+	SSHPort      int     `json:"ssh_port"`
+	Datacenter   string  `json:"datacenter"`
 }
 
 // SaveServerState persists server information to a file
 func SaveServerState(path string, server *HetznerServer) error {
 	state := ServerState{
-		ServerID:   server.ID,
-		ServerName: server.Name,
-		ServerIP:   server.IP,
-		SSHKeyID:   server.SSHKeyID,
-		SSHPort:    server.SSHPort,
-		Datacenter: server.Datacenter,
+		ServerID:     server.ID,
+		ServerName:   server.Name,
+		ServerIP:     server.IP,
+		SSHKeyID:     server.SSHKeyID,
+		GitHubKeyIDs: server.GitHubKeyIDs,
+		SSHPort:      server.SSHPort,
+		Datacenter:   server.Datacenter,
 	}
 
 	data, err := json.MarshalIndent(state, "", "  ")

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
 // GitHubSSHKey represents a GitHub user's SSH key
@@ -30,10 +29,8 @@ func FetchGitHubUserSSHKeys(ctx context.Context, username string) ([]string, err
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	// Set a reasonable timeout
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	// Use client without its own timeout, relying on context
+	client := &http.Client{}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -45,7 +42,8 @@ func FetchGitHubUserSSHKeys(ctx context.Context, username string) ([]string, err
 		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// Limit response body to 1MB to prevent memory exhaustion
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}

@@ -17,14 +17,15 @@ type HetznerClient struct {
 }
 
 type HetznerServer struct {
-	ID         int64
-	Name       string
-	IP         string
-	SSHUser    string
-	SSHKey     []byte
-	SSHPort    int
-	SSHKeyID   int64
-	Datacenter string
+	ID            int64
+	Name          string
+	IP            string
+	SSHUser       string
+	SSHKey        []byte
+	SSHPort       int
+	SSHKeyID      int64
+	GitHubKeyIDs  []int64
+	Datacenter    string
 }
 
 func NewHetznerClient(token string) *HetznerClient {
@@ -74,6 +75,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 
 	// Collect all SSH keys to inject
 	sshKeys := []*hcloud.SSHKey{createdKey}
+	var githubKeyIDs []int64
 
 	// Try to fetch and inject GitHub user SSH keys if in GitHub Actions
 	githubKeys, err := GetGitHubActorSSHKeys(ctx)
@@ -92,6 +94,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 				continue
 			}
 			sshKeys = append(sshKeys, ghKey)
+			githubKeyIDs = append(githubKeyIDs, ghKey.ID)
 		}
 	}
 
@@ -126,23 +129,20 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	}
 
 	return &HetznerServer{
-		ID:         server.ID,
-		Name:       server.Name,
-		IP:         ip,
-		SSHUser:    "root",
-		SSHKey:     privateKey,
-		SSHPort:    cfg.SSHPort,
-		SSHKeyID:   createdKey.ID,
-		Datacenter: server.Datacenter.Name,
+		ID:           server.ID,
+		Name:         server.Name,
+		IP:           ip,
+		SSHUser:      "root",
+		SSHKey:       privateKey,
+		SSHPort:      cfg.SSHPort,
+		SSHKeyID:     createdKey.ID,
+		GitHubKeyIDs: githubKeyIDs,
+		Datacenter:   server.Datacenter.Name,
 	}, nil
 }
 
 func (hc *HetznerClient) DeleteServer(ctx context.Context, id int64) error {
-	_, _, err := hc.client.Server.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("get server: %w", err)
-	}
-	_, err = hc.client.Server.Delete(ctx, &hcloud.Server{ID: id})
+	_, err := hc.client.Server.Delete(ctx, &hcloud.Server{ID: id})
 	if err != nil {
 		return fmt.Errorf("delete server: %w", err)
 	}
@@ -152,6 +152,10 @@ func (hc *HetznerClient) DeleteServer(ctx context.Context, id int64) error {
 func (hc *HetznerClient) ServerExists(ctx context.Context, id int64) (bool, error) {
 	server, _, err := hc.client.Server.GetByID(ctx, id)
 	if err != nil {
+		// Check if it's a "not found" error
+		if hcloud.IsError(err, hcloud.ErrorCodeNotFound) {
+			return false, nil
+		}
 		return false, fmt.Errorf("check server existence: %w", err)
 	}
 	return server != nil, nil

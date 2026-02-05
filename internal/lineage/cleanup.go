@@ -53,6 +53,16 @@ func CleanupPersistedServer(ctx context.Context, cfg Config) error {
 		}
 	}
 
+	// Delete GitHub user SSH keys if present
+	for _, keyID := range state.GitHubKeyIDs {
+		log.Printf("deleting GitHub SSH key %d...", keyID)
+		if err := hetznerClient.DeleteSSHKey(ctx, keyID); err != nil {
+			log.Printf("warning: failed to delete GitHub SSH key %d: %v", keyID, err)
+		} else {
+			log.Printf("successfully deleted GitHub SSH key %d", keyID)
+		}
+	}
+
 	// Clean up state file
 	if err := DeleteServerState(cfg.ServerStatePath); err != nil {
 		log.Printf("warning: failed to delete state file: %v", err)
