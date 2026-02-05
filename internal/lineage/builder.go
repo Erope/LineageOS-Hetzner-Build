@@ -163,7 +163,7 @@ func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 }
 
 func (b *Builder) collectArtifacts(ctx context.Context) ([]string, error) {
-	command := fmt.Sprintf("cd %s && find %s -maxdepth 2 -type f -name %s -print", shellQuote(b.workDir), shellQuote(b.artifactDir), shellQuote(b.artifactPattern))
+	command := fmt.Sprintf("cd %s && find %s -maxdepth 3 -type f -name %s -print", shellQuote(b.workDir), shellQuote(b.artifactDir), shellQuote(b.artifactPattern))
 	stdout, _, err := b.ssh.Run(ctx, command)
 	b.logs = append(b.logs, stdout)
 	if err != nil {
