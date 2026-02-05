@@ -28,6 +28,10 @@ inputs:
   ARTIFACT_PATTERN:
     description: Artifact file glob
     required: false
+  KEEP_SERVER_ON_FAILURE:
+    description: Keep server alive on failure for debugging
+    required: false
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -52,4 +56,17 @@ runs:
         BUILD_WORKDIR: ${{ inputs.BUILD_WORKDIR }}
         ARTIFACT_DIR: ${{ inputs.ARTIFACT_DIR }}
         ARTIFACT_PATTERN: ${{ inputs.ARTIFACT_PATTERN }}
+        KEEP_SERVER_ON_FAILURE: ${{ inputs.KEEP_SERVER_ON_FAILURE }}
       run: ${{ github.action_path }}/lineage-builder
+    - name: Cleanup server resources
+      if: always()
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        HETZNER_TOKEN: ${{ inputs.HETZNER_TOKEN }}
+        KEEP_SERVER_ON_FAILURE: ${{ inputs.KEEP_SERVER_ON_FAILURE }}
+      run: |
+        # Only run cleanup if KEEP_SERVER_ON_FAILURE is not true
+        if [ "$KEEP_SERVER_ON_FAILURE" != "true" ]; then
+          ${{ github.action_path }}/lineage-builder --cleanup || true
+        fi

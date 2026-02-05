@@ -1,0 +1,24 @@
+# Binaries
+lineage-builder
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Build artifacts
+artifacts/
+
+# Server state file (contains server info for cleanup)
+.hetzner-server-state.json
+
+# Logs
+*.log

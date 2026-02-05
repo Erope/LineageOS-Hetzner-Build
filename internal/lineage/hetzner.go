@@ -3,6 +3,7 @@ package lineage
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -71,6 +72,29 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		return nil, fmt.Errorf("create ssh key: %w", err)
 	}
 
+	// Collect all SSH keys to inject
+	sshKeys := []*hcloud.SSHKey{createdKey}
+
+	// Try to fetch and inject GitHub user SSH keys if in GitHub Actions
+	githubKeys, err := GetGitHubActorSSHKeys(ctx)
+	if err != nil {
+		log.Printf("warning: %v", err)
+	} else if len(githubKeys) > 0 {
+		log.Printf("found %d SSH key(s) from GitHub user, injecting into server for debugging", len(githubKeys))
+		for i, key := range githubKeys {
+			ghKeyName := fmt.Sprintf("github-user-key-%d-%d", time.Now().Unix(), i)
+			ghKey, _, err := hc.client.SSHKey.Create(ctx, hcloud.SSHKeyCreateOpts{
+				Name:      ghKeyName,
+				PublicKey: key,
+			})
+			if err != nil {
+				log.Printf("warning: failed to create GitHub SSH key %d: %v", i, err)
+				continue
+			}
+			sshKeys = append(sshKeys, ghKey)
+		}
+	}
+
 	userData, err := readUserData(cfg.ServerUserDataPath)
 	if err != nil {
 		return nil, err
@@ -82,7 +106,7 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 		Image:      image,
 		Location:   location,
 		UserData:   userData,
-		SSHKeys:    []*hcloud.SSHKey{createdKey},
+		SSHKeys:    sshKeys,
 	}
 
 	result, _, err := hc.client.Server.Create(ctx, request)
@@ -114,11 +138,23 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 }
 
 func (hc *HetznerClient) DeleteServer(ctx context.Context, id int64) error {
-	_, err := hc.client.Server.Delete(ctx, &hcloud.Server{ID: id})
+	_, _, err := hc.client.Server.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get server: %w", err)
+	}
+	_, err = hc.client.Server.Delete(ctx, &hcloud.Server{ID: id})
 	if err != nil {
 		return fmt.Errorf("delete server: %w", err)
 	}
 	return nil
+}
+
+func (hc *HetznerClient) ServerExists(ctx context.Context, id int64) (bool, error) {
+	server, _, err := hc.client.Server.GetByID(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("check server existence: %w", err)
+	}
+	return server != nil, nil
 }
 
 func (hc *HetznerClient) DeleteSSHKey(ctx context.Context, id int64) error {

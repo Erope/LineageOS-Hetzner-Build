@@ -18,6 +18,7 @@ const (
 	defaultArtifactDir    = "zips"
 	defaultArtifactGlob   = "*.zip"
 	defaultLocalArtifacts = "artifacts"
+	defaultServerStatePath = ".hetzner-server-state.json"
 )
 
 func LoadConfigFromEnv() (Config, error) {
@@ -37,6 +38,8 @@ func LoadConfigFromEnv() (Config, error) {
 		LocalArtifactDir:    envOrDefault("LOCAL_ARTIFACT_DIR", defaultLocalArtifacts),
 		SSHPort:             envToInt("HETZNER_SSH_PORT", defaultSSHPort),
 		BuildTimeoutMinutes: envToInt("BUILD_TIMEOUT_MINUTES", defaultTimeoutMins),
+		KeepServerOnFailure: envToBool("KEEP_SERVER_ON_FAILURE", false),
+		ServerStatePath:     envOrDefault("SERVER_STATE_PATH", defaultServerStatePath),
 	}
 
 	if cfg.HetznerToken == "" {
@@ -63,6 +66,18 @@ func envToInt(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envToBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return fallback
 	}

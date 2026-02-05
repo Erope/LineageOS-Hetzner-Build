@@ -38,19 +38,48 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		return err
 	}
 	log.Printf("server created: id=%d name=%s ip=%s datacenter=%s", server.ID, server.Name, server.IP, server.Datacenter)
+
+	// Save server state for potential cleanup after crash
+	if err := SaveServerState(o.cfg.ServerStatePath, server); err != nil {
+		log.Printf("warning: failed to save server state: %v", err)
+	}
+
+	// Track whether we should delete the server
+	shouldDeleteServer := true
+
 	defer func() {
-		log.Printf("cleaning up server %d and ssh key %d", server.ID, server.SSHKeyID)
-		if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
-			log.Printf("failed to delete server %d: %v", server.ID, err)
-		}
-		if err := o.hetznerClient.DeleteSSHKey(context.Background(), server.SSHKeyID); err != nil {
-			log.Printf("failed to delete ssh key %d: %v", server.SSHKeyID, err)
+		if shouldDeleteServer {
+			log.Printf("cleaning up server %d and ssh key %d", server.ID, server.SSHKeyID)
+			if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
+				log.Printf("failed to delete server %d: %v", server.ID, err)
+			}
+			if err := o.hetznerClient.DeleteSSHKey(context.Background(), server.SSHKeyID); err != nil {
+				log.Printf("failed to delete ssh key %d: %v", server.SSHKeyID, err)
+			}
+			// Clean up state file after successful deletion
+			if err := DeleteServerState(o.cfg.ServerStatePath); err != nil {
+				log.Printf("warning: failed to delete server state file: %v", err)
+			}
+		} else {
+			log.Printf("⚠️  WARNING: Server is being kept alive due to KEEP_SERVER_ON_FAILURE=true")
+			log.Printf("⚠️  Server details:")
+			log.Printf("⚠️    ID: %d", server.ID)
+			log.Printf("⚠️    Name: %s", server.Name)
+			log.Printf("⚠️    IP: %s", server.IP)
+			log.Printf("⚠️    SSH Port: %d", server.SSHPort)
+			log.Printf("⚠️    Datacenter: %s", server.Datacenter)
+			log.Printf("⚠️  To connect: ssh root@%s -p %d", server.IP, server.SSHPort)
+			log.Printf("⚠️  Server state saved to: %s", o.cfg.ServerStatePath)
+			log.Printf("⚠️  To cleanup later, run: lineage-builder --cleanup")
 		}
 	}()
 
 	progress.Step("wait for server to be running")
 	log.Printf("waiting for server %d to reach running status...", server.ID)
 	if err := o.hetznerClient.WaitForServer(ctx, server.ID); err != nil {
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return fmt.Errorf("wait for server: %w", err)
 	}
 	log.Printf("server %d is running", server.ID)
@@ -59,12 +88,18 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	progress.Step("wait for SSH to become available")
 	log.Printf("waiting for SSH port on %s...", addr)
 	if err := waitForPort(ctx, addr, 5*time.Minute); err != nil {
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return fmt.Errorf("wait for ssh: %w", err)
 	}
 	log.Printf("SSH port is open on %s", addr)
 
 	sshClient, err := NewSSHClient(addr, server.SSHUser, server.SSHKey, 30*time.Second)
 	if err != nil {
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return err
 	}
 	// 设置实时输出到 GitHub Actions 日志
@@ -81,6 +116,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	const stabilityDuration = 2 * time.Minute
 	log.Printf("waiting for rescue system to exit and SSH to stabilize (stability duration: %v)...", stabilityDuration)
 	if err := waitForStableSSH(ctx, sshClient, rescueExitTimeout, stabilityDuration); err != nil {
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return err
 	}
 	log.Printf("SSH connection is stable, system has exited rescue mode")
@@ -92,6 +130,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	progress.Step("stage source on server")
 	log.Printf("uploading source archive to server...")
 	if err := builder.StageSource(buildCtx, archivePath); err != nil {
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return err
 	}
 	log.Printf("source staged successfully")
@@ -115,6 +156,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 		if combinedLogs != "" {
 			_ = saveLogs(o.cfg, sanitizeLog(combinedLogs))
 		}
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return fmt.Errorf("build failed: %w", err)
 	}
 	log.Printf("build completed successfully")
@@ -122,6 +166,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	progress.Step("download artifacts")
 	artifacts, err := builder.DownloadArtifacts(ctx, result.Artifacts)
 	if err != nil {
+		if o.cfg.KeepServerOnFailure {
+			shouldDeleteServer = false
+		}
 		return err
 	}
 	log.Printf("downloaded %d artifacts", len(artifacts))
