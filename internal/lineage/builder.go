@@ -54,8 +54,8 @@ func (b *Builder) runCompose(ctx context.Context) error {
 	// [DIAGNOSE] compose 执行前：确认 docker-compose.yml 存在
 	b.logDiagnostic("Pre-compose: checking if compose file exists")
 	checkCmd := fmt.Sprintf("ls -la %s/%s 2>&1 || echo 'COMPOSE_FILE_NOT_FOUND'", shellQuote(b.workDir), shellQuote(b.compose))
-	stdout, stderr, _ := b.ssh.Run(ctx, checkCmd)
-	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Compose file check: stdout=%s stderr=%s", stdout, stderr))
+	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Compose file check: %s", checkCmd))
+	_, _, _ = b.ssh.Run(ctx, checkCmd)
 
 	command := b.buildComposeCommand()
 	return b.runCommand(ctx, command)
@@ -143,8 +143,8 @@ func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 	// [DIAGNOSE] 上传后：确认远程文件存在
 	b.logDiagnostic("Post-upload: verifying remote archive exists")
 	verifyCmd := fmt.Sprintf("ls -la %s", remoteArchive)
-	stdout, stderr, _ := b.ssh.Run(ctx, verifyCmd)
-	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Remote archive verification: stdout=%s stderr=%s", stdout, stderr))
+	b.logs = append(b.logs, fmt.Sprintf("[DIAGNOSE] Remote archive verification: %s", verifyCmd))
+	_, _, _ = b.ssh.Run(ctx, verifyCmd)
 
 	commands := []string{
 		"set -euo pipefail",
@@ -163,13 +163,28 @@ func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 }
 
 func (b *Builder) collectArtifacts(ctx context.Context) ([]string, error) {
-	command := fmt.Sprintf("cd %s && find %s -maxdepth 2 -type f -name %s -print", shellQuote(b.workDir), shellQuote(b.artifactDir), shellQuote(b.artifactPattern))
-	stdout, _, err := b.ssh.Run(ctx, command)
-	b.logs = append(b.logs, stdout)
+	// 把文件列表输出到远程文件，然后通过下载文件获取结果（因为 stdout 已重定向到终端）
+	remoteListFile := "/tmp/artifacts-list.txt"
+	command := fmt.Sprintf("cd %s && find %s -maxdepth 2 -type f -name %s -print > %s", shellQuote(b.workDir), shellQuote(b.artifactDir), shellQuote(b.artifactPattern), remoteListFile)
+	_, _, err := b.ssh.Run(ctx, command)
 	if err != nil {
 		return nil, fmt.Errorf("list artifacts: %w", err)
 	}
-	files := strings.Fields(strings.TrimSpace(stdout))
+
+	// 下载列表文件到临时位置
+	localListFile := filepath.Join(os.TempDir(), "artifacts-list.txt")
+	if err := b.ssh.Download(ctx, remoteListFile, localListFile); err != nil {
+		return nil, fmt.Errorf("download artifacts list: %w", err)
+	}
+	defer os.Remove(localListFile)
+
+	// 读取文件内容
+	content, err := os.ReadFile(localListFile)
+	if err != nil {
+		return nil, fmt.Errorf("read artifacts list: %w", err)
+	}
+
+	files := strings.Fields(string(content))
 	if len(files) == 0 {
 		return nil, fmt.Errorf("no artifacts matched %s/%s", b.artifactDir, b.artifactPattern)
 	}
@@ -196,13 +211,28 @@ func (b *Builder) DownloadArtifacts(ctx context.Context, files []string) ([]stri
 }
 
 func (b *Builder) SaveRemoteLogs(ctx context.Context) (string, error) {
-	command := fmt.Sprintf("cd %s && docker compose -f %s logs --no-color", shellQuote(b.workDir), shellQuote(b.compose))
-	stdout, stderr, err := b.ssh.Run(ctx, command)
-	b.logs = append(b.logs, stdout)
-	if stderr != "" {
-		b.logs = append(b.logs, stderr)
+	// 把日志输出到远程文件，然后下载（因为 stdout 已重定向到终端）
+	remoteLogFile := "/tmp/docker-compose-logs.txt"
+	command := fmt.Sprintf("cd %s && docker compose -f %s logs --no-color > %s 2>&1", shellQuote(b.workDir), shellQuote(b.compose), remoteLogFile)
+	_, _, err := b.ssh.Run(ctx, command)
+	if err != nil {
+		return "", fmt.Errorf("collect remote logs: %w", err)
 	}
-	return joinLogParts(stdout, stderr), err
+
+	// 下载日志文件
+	localLogFile := filepath.Join(os.TempDir(), "docker-compose-logs.txt")
+	if err := b.ssh.Download(ctx, remoteLogFile, localLogFile); err != nil {
+		return "", fmt.Errorf("download remote logs: %w", err)
+	}
+	defer os.Remove(localLogFile)
+
+	// 读取内容
+	content, err := os.ReadFile(localLogFile)
+	if err != nil {
+		return "", fmt.Errorf("read remote logs: %w", err)
+	}
+
+	return string(content), nil
 }
 
 func (b *Builder) joinLogs() string {
@@ -226,11 +256,8 @@ func joinLogParts(values ...string) string {
 
 func (b *Builder) runCommand(ctx context.Context, command string) error {
 	b.logs = append(b.logs, fmt.Sprintf("%s %s", commandLogPrefix, command))
-	stdout, stderr, err := b.ssh.Run(ctx, command)
-	b.logs = append(b.logs, stdout)
-	if stderr != "" {
-		b.logs = append(b.logs, stderr)
-	}
+	_, _, err := b.ssh.Run(ctx, command)
+	// 注意：输出已实时显示在终端，不再返回
 	if err != nil {
 		return fmt.Errorf("remote command failed: %w", err)
 	}
