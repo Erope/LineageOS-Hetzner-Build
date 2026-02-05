@@ -61,7 +61,7 @@ func (hc *HetznerClient) findOrCreateSSHKey(ctx context.Context, name, publicKey
 	}
 
 	// Check if it's a uniqueness error
-	if hcloudErr, ok := err.(hcloud.Error); ok && hcloudErr.Code == "uniqueness_error" {
+	if hcloud.IsError(err, hcloud.ErrorCodeUniquenessError) {
 		// Key already exists, try to find it by fingerprint
 		fingerprint, fpErr := computeSSHKeyFingerprint(publicKey)
 		if fpErr != nil {
@@ -137,6 +137,11 @@ func (hc *HetznerClient) CreateServer(ctx context.Context, cfg Config) (*Hetzner
 	} else if len(githubKeys) > 0 {
 		log.Printf("found %d SSH key(s) from GitHub user, injecting into server for debugging", len(githubKeys))
 		for i, key := range githubKeys {
+			// Note: Hetzner enforces uniqueness of SSH keys based on the public key
+			// content, not on the key name. This timestamp-based name provides a
+			// human-friendly identifier but does not prevent collisions when the
+			// same public key content already exists. In such cases, findOrCreateSSHKey
+			// will detect the existing key by fingerprint and reuse it.
 			ghKeyName := fmt.Sprintf("github-user-key-%d-%d", time.Now().Unix(), i)
 			ghKey, reused, err := hc.findOrCreateSSHKey(ctx, ghKeyName, key)
 			if err != nil {
