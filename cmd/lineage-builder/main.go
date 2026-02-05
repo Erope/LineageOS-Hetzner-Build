@@ -20,7 +20,7 @@ func main() {
 		log.Printf("running in cleanup mode")
 		cfg := lineage.Config{
 			HetznerToken:    os.Getenv("HETZNER_TOKEN"),
-			ServerStatePath: envOrDefault("SERVER_STATE_PATH", ".hetzner-server-state.json"),
+			ServerStatePath: lineage.EnvOrDefault("SERVER_STATE_PATH", ".hetzner-server-state.json"),
 		}
 
 		if cfg.HetznerToken == "" {
@@ -49,12 +49,4 @@ func main() {
 		os.Exit(1)
 	}
 	log.Printf("build completed successfully")
-}
-
-func envOrDefault(key, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
-	}
-	return value
 }

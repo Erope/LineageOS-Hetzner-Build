@@ -52,12 +52,18 @@ func LoadConfigFromEnv() (Config, error) {
 	return cfg, nil
 }
 
-func envOrDefault(key, fallback string) string {
+// EnvOrDefault returns the value of the environment variable or a fallback if not set
+func EnvOrDefault(key, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		return fallback
 	}
 	return value
+}
+
+// envOrDefault is a private alias for backward compatibility within this package
+func envOrDefault(key, fallback string) string {
+	return EnvOrDefault(key, fallback)
 }
 
 func envToInt(key string, fallback int) int {

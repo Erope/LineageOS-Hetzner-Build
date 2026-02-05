@@ -50,15 +50,19 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	defer func() {
 		if shouldDeleteServer {
 			log.Printf("cleaning up server %d and ssh keys", server.ID)
-			if err := o.hetznerClient.DeleteServer(context.Background(), server.ID); err != nil {
+			// Use a timeout context for cleanup to prevent hanging indefinitely
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if err := o.hetznerClient.DeleteServer(cleanupCtx, server.ID); err != nil {
 				log.Printf("failed to delete server %d: %v", server.ID, err)
 			}
-			if err := o.hetznerClient.DeleteSSHKey(context.Background(), server.SSHKeyID); err != nil {
+			if err := o.hetznerClient.DeleteSSHKey(cleanupCtx, server.SSHKeyID); err != nil {
 				log.Printf("failed to delete ssh key %d: %v", server.SSHKeyID, err)
 			}
 			// Delete GitHub user SSH keys
 			for _, keyID := range server.GitHubKeyIDs {
-				if err := o.hetznerClient.DeleteSSHKey(context.Background(), keyID); err != nil {
+				if err := o.hetznerClient.DeleteSSHKey(cleanupCtx, keyID); err != nil {
 					log.Printf("failed to delete GitHub SSH key %d: %v", keyID, err)
 				}
 			}
