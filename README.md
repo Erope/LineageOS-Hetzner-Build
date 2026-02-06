@@ -1,6 +1,6 @@
 # LineageOS-Hetzner-Build
 
-该工具用于在 Hetzner Cloud 上启动临时实例，执行 docker-lineage-cicd 构建，并将生成的构建产物下载回本地。工具只负责远程构建与产物拉取，不再包含 Git Release 等后处理逻辑。
+该工具用于在 Hetzner Cloud 上启动临时实例，执行 docker-lineage-cicd 构建，并将生成的构建产物下载回本地。
 
 构建流程会在实例上检测并通过 get.docker.com 脚本安装 Docker 与 Docker Compose 插件（需使用具备 root 权限且包含 curl 的镜像），以确保 docker compose 可用。可选设置 `GET_DOCKER_SHA256` 用于校验安装脚本；未设置时会提示在生产环境中先审核脚本内容。安装依赖系统默认的 Docker 安装脚本与签名校验；如需自定义镜像或源，请确保 Docker 与 Compose 插件版本兼容且仓库可信。
 
@@ -9,7 +9,7 @@
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `HETZNER_TOKEN` | Hetzner Cloud API Token | 必填 |
-| `HETZNER_SERVER_TYPE` | Hetzner 实例类型 | `cx41` |
+| `HETZNER_SERVER_TYPE` | Hetzner 实例类型 | `cpx62` |
 | `HETZNER_SERVER_LOCATION` | Hetzner 实例位置 | (空) |
 | `HETZNER_SERVER_IMAGE` | Hetzner 实例镜像 | `ubuntu-22.04` |
 | `HETZNER_SERVER_NAME` | 实例名称 | `lineageos-builder` |
@@ -18,7 +18,7 @@
 | `BUILD_SOURCE_DIR` | 本地源目录（包含 docker-compose 与依赖文件） | 必填 |
 | `BUILD_COMPOSE_FILE` | docker-compose 文件路径 | `docker-compose.yml` |
 | `BUILD_WORKDIR` | 实例工作目录 | `lineageos-build` |
-| `BUILD_TIMEOUT_MINUTES` | 构建超时时间（分钟） | `360` |
+| `BUILD_TIMEOUT_MINUTES` | 构建超时时间（分钟） | `300` |
 | `ARTIFACT_DIR` | 远程产物目录 | `zips` |
 | `ARTIFACT_PATTERN` | 产物文件匹配 | `*.zip` |
 | `LOCAL_ARTIFACT_DIR` | 本地保存产物目录 | `artifacts` |
@@ -91,7 +91,7 @@ go run ./cmd/lineage-builder --cleanup
   with:
     HETZNER_TOKEN: ${{ secrets.HETZNER_TOKEN }}
     # 以下为可选
-    HETZNER_SERVER_TYPE: cx41
+    HETZNER_SERVER_TYPE: cpx62
     HETZNER_SERVER_LOCATION: fsn1
     HETZNER_SERVER_IMAGE: ubuntu-22.04
     HETZNER_SERVER_NAME: lineageos-builder
