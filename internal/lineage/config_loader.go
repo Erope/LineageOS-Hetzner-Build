@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	defaultServerType     = "cx41"
+	defaultServerType     = "cpx62"
 	defaultServerImage    = "ubuntu-22.04"
 	defaultServerName     = "lineageos-builder"
 	defaultComposeFile    = "docker-compose.yml"
 	defaultServiceName    = "build"
 	defaultWorkingDir     = "lineageos-build"
 	defaultSSHPort        = 22
-	defaultTimeoutMins    = 360
+	defaultTimeoutMins    = 300
 	defaultArtifactDir    = "zips"
 	defaultArtifactGlob   = "*.zip"
 	defaultLocalArtifacts = "artifacts"
