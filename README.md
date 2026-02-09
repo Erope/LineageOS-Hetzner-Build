@@ -128,3 +128,14 @@ action 配置了自动清理步骤，无论构建是否成功，都会尝试清�
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+## 示例项目
+
+参考 [onclite_los_18_1_build](https://github.com/Erope/onclite_los_18_1_build) 项目，这是一个完整的使用本工具构建 LineageOS 18.1 for Redmi 7 (onclite) 的示例：
+
+- 展示了完整的 `docker-compose.yml` 配置
+- 包含 GitHub Actions workflow 调用示例
+- 演示了如何使用 `KEEP_SERVER_ON_FAILURE` 调试构建失败
+- 目录结构清晰，包含 ccache、manifests、logs、userscripts 等标准目录
+
+可以直接克隆该仓库作为模板开始你的 LineageOS 构建项目。
