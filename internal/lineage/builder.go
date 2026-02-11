@@ -157,7 +157,7 @@ func (b *Builder) StageSource(ctx context.Context, archivePath string) error {
 
 	// [DIAGNOSE] 解压后：打印工作目录内容
 	command += fmt.Sprintf(" && echo '[DIAGNOSE] Post-extract: listing workDir=%s' && ls -la %s", b.workDir, shellQuote(b.workDir))
-	command += fmt.Sprintf(" && echo '[DIAGNOSE] Post-extract: find all files in workDir' && find %s -type f 2>&1 | head -50", shellQuote(b.workDir))
+	command += fmt.Sprintf(" && echo '[DIAGNOSE] Post-extract: find all files in workDir' && (find %s -type f 2>&1 | head -50 || true)", shellQuote(b.workDir))
 
 	return b.runCommand(ctx, command)
 }

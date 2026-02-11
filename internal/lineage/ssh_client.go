@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -40,6 +41,7 @@ func NewSSHClient(addr, user string, privateKey []byte, timeout time.Duration) (
 }
 
 func (c *SSHClient) Run(ctx context.Context, command string) (string, string, error) {
+	log.Printf("%s %s", commandLogPrefix, command)
 	client, err := c.dial()
 	if err != nil {
 		return "", "", err
@@ -73,6 +75,12 @@ func (c *SSHClient) Run(ctx context.Context, command string) (string, string, er
 		// 确保刷新剩余内容
 		stdoutWriter.flush()
 		stderrWriter.flush()
+		if out := strings.TrimSpace(stdoutBuf.String()); out != "" {
+			log.Printf("[SSH][stdout]\n%s", out)
+		}
+		if errOut := strings.TrimSpace(stderrBuf.String()); errOut != "" {
+			log.Printf("[SSH][stderr]\n%s", errOut)
+		}
 		if err != nil {
 			return stdoutBuf.String(), stderrBuf.String(), fmt.Errorf("run command: %w", err)
 		}
